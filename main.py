@@ -10,6 +10,7 @@ from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
 from dotenv import load_dotenv
 from datetime import datetime
+from ai_persona import get_dungeon_master_prompt
 
 # --- CONFIGURATION ---
 load_dotenv()
@@ -18,7 +19,8 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 
 # Gemini Setup
 genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
-model = genai.GenerativeModel('gemini-1.5-flash')
+model = genai.GenerativeModel('gemini-2.5-flash')
+# imagen_model = genai.GenerativeModel('nano-banana-pro-preview')
 
 # File Paths (Railway Persistence Logic)
 # If /data exists (Railway Volume), use it. Otherwise use local folder.
@@ -30,18 +32,21 @@ RULES_FILE = "rules.json"
 creation_sessions = {}
 players = {}
 RULES = {}
+chat_history = [] # List of strings: "Name: Message"
+start_time = datetime.now()
+last_thought = "Waiting for the adventure to begin..."
 
 # --- DATA MANAGEMENT ---
 def load_data():
     """Loads rules and game state."""
-    global players, RULES
+    global players, RULES, chat_history
     # Load Rules
     try:
         with open(RULES_FILE, "r") as f:
             RULES = json.load(f)
-        print("✅ Rules loaded.")
+        print("[OK] Rules loaded.")
     except FileNotFoundError:
-        print("❌ CRITICAL: rules.json not found!")
+        print("[ERROR] CRITICAL: rules.json not found!")
         RULES = {}
 
     # Load Game State
@@ -50,19 +55,21 @@ def load_data():
             with open(STATE_FILE, "r") as f:
                 data = json.load(f)
                 players = data.get("players", {})
-            print(f"📂 Game State Loaded from {STATE_FILE}")
+                chat_history = data.get("chat_history", [])
+            print(f"[INFO] Game State Loaded from {STATE_FILE}")
         except Exception as e:
-            print(f"⚠️ Error loading state: {e}")
+            print(f"[WARN] Error loading state: {e}")
 
 def save_state():
     """Saves game state to local disk (Railway Volume)."""
     state = {
         "players": players,
+        "chat_history": chat_history,
         "last_updated": str(datetime.now())
     }
     with open(STATE_FILE, "w") as f:
         json.dump(state, f, indent=4)
-    print("💾 State Saved to Disk.")
+    print("[INFO] State Saved to Disk.")
 
 # --- GOOGLE DRIVE BACKUP ---
 async def backup_to_drive():
@@ -71,10 +78,10 @@ async def backup_to_drive():
     folder_id = os.getenv("GOOGLE_DRIVE_FOLDER_ID")
     
     if not raw_creds or not folder_id:
-        print("☁️ Drive Backup Skipped (Missing Credentials).")
+        print("[INFO] Drive Backup Skipped (Missing Credentials).")
         return "Backup skipped (Check logs)."
 
-    print("☁️ Starting Google Drive Backup...")
+    print("[INFO] Starting Google Drive Backup...")
     try:
         creds_dict = json.loads(raw_creds)
         creds = service_account.Credentials.from_service_account_info(creds_dict)
@@ -91,17 +98,17 @@ async def backup_to_drive():
             # Update existing file
             file_id = files[0]['id']
             service.files().update(fileId=file_id, media_body=media).execute()
-            print("☁️ Backup Updated.")
+            print("[INFO] Backup Updated.")
             return "Backup Successful (Updated)."
         else:
             # Create new file
             file_metadata = {'name': 'campaign_state.json', 'parents': [folder_id]}
             service.files().create(body=file_metadata, media_body=media).execute()
-            print("☁️ Backup Created.")
+            print("[INFO] Backup Created.")
             return "Backup Successful (Created)."
             
     except Exception as e:
-        print(f"❌ Drive Error: {e}")
+        print(f"[ERROR] Drive Error: {e}")
         return f"Backup Failed: {e}"
 
 @tasks.loop(hours=168) # Run once a week
@@ -109,15 +116,32 @@ async def weekly_backup_task():
     await backup_to_drive()
 
 # --- AI NARRATOR ---
-async def get_ai_response(history, user_input, user_name):
-    prompt = (
-        "SYSTEM: You are a D&D 5e Dungeon Master running a private campaign. "
-        "Style: Vivid, concise (under 1000 chars), engaging. "
-        "Rules: If a player acts, narrate the result. If they need to roll, ask them. "
-        f"CONTEXT: {history}\nPLAYER ({user_name}): {user_input}"
-    )
-    response = await asyncio.to_thread(model.generate_content, prompt)
-    return response.text
+async def get_ai_response(user_input, user_name):
+    global last_thought, chat_history
+    last_thought = f"Processing input from {user_name}: '{user_input}'..."
+    
+    # Update History
+    chat_history.append(f"{user_name}: {user_input}")
+    
+    # Keep context manageable (last 20 turns for AI context)
+    context_str = "\n".join(chat_history[-20:])
+    
+    prompt = get_dungeon_master_prompt(context_str)
+    
+    try:
+        response = await asyncio.to_thread(model.generate_content, prompt)
+        text_response = response.text
+    except Exception as e:
+        print(f"[ERROR] AI Generation failed: {e}")
+        text_response = "⚠️ *The DM is feeling a bit overwhelmed (Rate Limit or Error). Give me a moment and try again!*"
+        last_thought = f"Error: {e}"
+        return text_response
+    
+    # Add AI response to history
+    chat_history.append(f"DM: {text_response}")
+    
+    last_thought = f"Finished narrating for {user_name}. Waiting for next move."
+    return text_response
 
 # --- COMMANDS ---
 
@@ -127,6 +151,29 @@ async def on_ready():
     if not weekly_backup_task.is_running():
         weekly_backup_task.start()
     print(f'Logged in as {bot.user}')
+
+@bot.command()
+async def start(ctx, *, premise=None):
+    """Start a new campaign. Usage: !start [optional premise]"""
+    async with ctx.typing():
+        if not premise:
+            # Generate a random premise if none provided
+            premise_prompt = "Generate a short, exciting, and slightly spicy D&D 5e campaign premise for a couple. Include a hook for adventure and intimacy."
+            premise = await asyncio.to_thread(model.generate_content, premise_prompt)
+            premise = premise.text
+
+        # Generate the opening narration
+        prompt = (
+            f"SYSTEM: You are starting a new campaign based on this premise: '{premise}'. "
+            "Set the scene. Describe the environment, the atmosphere (make it alluring), and where the characters are. "
+            "End with a call to action or a question to the players."
+        )
+        # Manually inject start into history
+        global chat_history
+        chat_history.append(f"System: Campaign Start - {premise}")
+        
+        response = await get_ai_response(f"Start the campaign with premise: {premise}", "System")
+        await ctx.send(f"📜 **The Adventure Begins...**\n\n**Premise:** {premise}\n\n{response}")
 
 @bot.command()
 async def create(ctx):
@@ -183,8 +230,68 @@ async def sheet(ctx):
 @bot.command()
 async def recap(ctx):
     """Ask AI for story summary."""
-    res = await get_ai_response("Summarize current story state.", "Recap please.", "System")
+    res = await get_ai_response("Recap please.", "System")
     await ctx.send(f"📅 **Story So Far:**\n{res}")
+
+@bot.command()
+async def guide(ctx):
+    """Ask the DM for a hint."""
+    res = await get_ai_response("I'm stuck, what should I do?", "System")
+    await ctx.send(f"💡 **DM's Guide:**\n{res}")
+
+@bot.command()
+async def status(ctx):
+    """Check the DM's mental state."""
+    uptime = str(datetime.now() - start_time).split('.')[0]
+    await ctx.send(f"🧠 **DM Status**\n**Uptime:** {uptime}\n**Current Thought:** {last_thought}")
+
+@bot.command()
+async def catchup(ctx):
+    """Show the last few turns of the story."""
+    if not chat_history:
+        await ctx.send("📭 **No story history yet!**")
+        return
+        
+    # Get last 4 messages
+    recent = chat_history[-4:]
+    summary = "\n\n".join(recent)
+    await ctx.send(f"📜 **Last 4 Turns:**\n\n{summary}")
+
+@bot.command()
+async def snapshot(ctx):
+    """Generate a picture of the current scene."""
+    await ctx.send("⚠️ **Snapshot is currently disabled** to focus on the story!")
+    # async with ctx.typing():
+    #     # 1. Get a visual description from the text model
+    #     prompt = (
+    #         "Describe the current scene and characters for an image generator. "
+    #         "Focus on visual details: lighting, colors, character appearance, and action. "
+    #         "Keep it under 100 words. Make it atmospheric and match the current story context."
+    #     )
+    #     scene_description = await get_ai_response(prompt, "System")
+        
+    #     # 2. Generate Image
+    #     try:
+    #         result = await asyncio.to_thread(
+    #             imagen_model.generate_images,
+    #             prompt=scene_description,
+    #             number_of_images=1
+    #         )
+            
+    #         # 3. Save and Send
+    #         if result.images:
+    #             # Save locally temporarily
+    #             image_path = "snapshot.png"
+    #             result.images[0].save(image_path)
+                
+    #             # Send to Discord
+    #             file = discord.File(image_path, filename="snapshot.png")
+    #             await ctx.send(f"📸 **Snapshot:** {scene_description}", file=file)
+    #         else:
+    #             await ctx.send("⚠️ Failed to generate image (Safety filter or API error).")
+                
+    #     except Exception as e:
+    #         await ctx.send(f"⚠️ Image Generation Error: {e}")
 
 @bot.command()
 async def fix(ctx):
@@ -228,13 +335,19 @@ async def on_message(message):
             else:
                 await message.channel.send("⚠️ Invalid Class.")
         return
+    
+    # Allow natural language to trigger commands
+    if message.content.lower().startswith("start game") or message.content.lower().startswith("begin adventure"):
+        ctx = await bot.get_context(message)
+        await start(ctx)
+        return
 
     await bot.process_commands(message)
 
     # Roleplay Logic
     if not message.content.startswith("!") and uid in players:
         async with message.channel.typing():
-            response = await get_ai_response("Game Context", message.content, message.author.display_name)
+            response = await get_ai_response(message.content, message.author.display_name)
             await message.channel.send(response)
             save_state() # SAVE IMMEDIATELY
 
