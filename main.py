@@ -186,9 +186,6 @@ async def start(ctx, *, premise=None):
             "Set the scene. Describe the environment, the atmosphere (make it alluring), and where the characters are. "
             "End with a call to action or a question to the players."
         )
-        # Manually inject start into history
-        global chat_history
-        chat_history.append(f"System: Campaign Start - {premise}")
         
         response = await get_ai_response(f"Start the campaign with premise: {premise}", "System")
         await ctx.send(f"📜 **The Adventure Begins...**\n\n**Premise:** {premise}\n\n{response}")
