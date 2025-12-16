@@ -11,6 +11,7 @@ from googleapiclient.http import MediaFileUpload
 from dotenv import load_dotenv
 from datetime import datetime
 from ai_persona import get_dungeon_master_prompt
+from google.generativeai.types import HarmCategory, HarmBlockThreshold
 
 # --- CONFIGURATION ---
 load_dotenv()
@@ -19,7 +20,20 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 
 # Gemini Setup
 genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
-model = genai.GenerativeModel('gemini-2.5-flash')
+
+# Define settings to allow the "Spicy" content
+safety_settings = {
+    HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: HarmBlockThreshold.BLOCK_NONE,
+    HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_ONLY_HIGH,
+    HarmCategory.HARM_CATEGORY_HATE_SPEECH: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
+    HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
+}
+
+# Use 1.5 Pro for better memory/logic (or keep 2.5 Flash if speed is priority)
+model = genai.GenerativeModel(
+    model_name='gemini-1.5-pro-002', # Highly recommended over Flash for D&D logic
+    safety_settings=safety_settings
+)
 # imagen_model = genai.GenerativeModel('nano-banana-pro-preview')
 
 # File Paths (Railway Persistence Logic)
@@ -123,10 +137,14 @@ async def get_ai_response(user_input, user_name):
     # Update History
     chat_history.append(f"{user_name}: {user_input}")
     
-    # Keep context manageable (last 20 turns for AI context)
-    context_str = "\n".join(chat_history[-20:])
+    # INCREASED MEMORY: Keep last 200 turns (Gemini Pro handles this easily)
+    context_str = "\n".join(chat_history[-200:])
     
-    prompt = get_dungeon_master_prompt(context_str)
+    # SERIALIZE STATE: Convert players dict to string so AI can read it
+    current_state_json = json.dumps(players, indent=2)
+    
+    # PASS BOTH TO PROMPT FUNCTION
+    prompt = get_dungeon_master_prompt(context_str, current_state_json)
     
     try:
         response = await asyncio.to_thread(model.generate_content, prompt)
