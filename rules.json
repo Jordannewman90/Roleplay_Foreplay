@@ -65,62 +65,104 @@
     "fighter": {
       "name": "Fighter",
       "hit_die": 10,
-      "equipment": "Chain Mail & Longsword"
+      "equipment": [
+        "Chain Mail",
+        "Longsword"
+      ]
     },
     "barbarian": {
       "name": "Barbarian",
       "hit_die": 12,
-      "equipment": "Greataxe & Handaxes"
+      "equipment": [
+        "Greataxe",
+        "Handaxes"
+      ]
     },
     "paladin": {
       "name": "Paladin",
       "hit_die": 10,
-      "equipment": "Chain Mail, Shield & Warhammer"
+      "equipment": [
+        "Chain Mail",
+        "Shield",
+        "Warhammer"
+      ]
     },
     "ranger": {
       "name": "Ranger",
       "hit_die": 10,
-      "equipment": "Scale Mail, Longbow & Shortswords"
+      "equipment": [
+        "Scale Mail",
+        "Longbow",
+        "Shortswords"
+      ]
     },
     "cleric": {
       "name": "Cleric",
       "hit_die": 8,
-      "equipment": "Mace, Scale Mail & Shield"
+      "equipment": [
+        "Mace",
+        "Scale Mail",
+        "Shield"
+      ]
     },
     "druid": {
       "name": "Druid",
       "hit_die": 8,
-      "equipment": "Leather Armor, Shield & Scimitar"
+      "equipment": [
+        "Leather Armor",
+        "Shield",
+        "Scimitar"
+      ]
     },
     "rogue": {
       "name": "Rogue",
       "hit_die": 8,
-      "equipment": "Leather Armor & Daggers"
+      "equipment": [
+        "Leather Armor",
+        "Daggers"
+      ]
     },
     "monk": {
       "name": "Monk",
       "hit_die": 8,
-      "equipment": "Shortsword & Darts"
+      "equipment": [
+        "Shortsword",
+        "Darts"
+      ]
     },
     "bard": {
       "name": "Bard",
       "hit_die": 8,
-      "equipment": "Leather Armor, Rapier & Musical Instrument"
+      "equipment": [
+        "Leather Armor",
+        "Rapier",
+        "Musical Instrument"
+      ]
     },
     "warlock": {
       "name": "Warlock",
       "hit_die": 8,
-      "equipment": "Leather Armor, Daggers & Arcane Focus"
+      "equipment": [
+        "Leather Armor",
+        "Daggers",
+        "Arcane Focus"
+      ]
     },
     "sorcerer": {
       "name": "Sorcerer",
       "hit_die": 6,
-      "equipment": "Daggers & Component Pouch"
+      "equipment": [
+        "Daggers",
+        "Component Pouch"
+      ]
     },
     "wizard": {
       "name": "Wizard",
       "hit_die": 6,
-      "equipment": "Quarterstaff & Spellbook"
+      "equipment": [
+        "Quarterstaff",
+        "Spellbook"
+      ]
     }
   },
   "monsters": {
