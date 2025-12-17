@@ -8,8 +8,6 @@ It combines legitimate tabletop RPG mechanics (stats, dice rolling, combat) with
 
 ## ✨ Key Features
 
-## ✨ Key Features
-
 ### 🎬 Cinematic Gameplay
 *   **Narrative First:** No more boring stats. `!fight` triggers a dramatic opening scene, and resting (`!rest`) starts a cozy campfire roleplay moment.
 *   **Natural Language Trigger:** You don't need commands. Just tell the bot "I attack the goblin" or "I want to pitch a tent," and it instinctively knows what to do.
