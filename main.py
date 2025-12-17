@@ -14,7 +14,6 @@ from dotenv import load_dotenv
 from datetime import datetime
 from ai_persona import get_dungeon_master_prompt
 import dice_engine
-import dice_engine
 import character_creator
 import campaign_crafter
 import image_generator
@@ -271,7 +270,8 @@ async def avatar(ctx, *, instruction: str = "Make me a fantasy character"):
     """Transformation! Attach a photo OR use saved face. Usage: !avatar [style instructions]"""
     
     uid = str(ctx.author.id)
-    input_image = None
+    input_image_bytes = None
+    input_mime_type = None
     
     async with ctx.typing():
         try:
@@ -279,25 +279,24 @@ async def avatar(ctx, *, instruction: str = "Make me a fantasy character"):
             if ctx.message.attachments:
                 attachment = ctx.message.attachments[0]
                 if attachment.content_type.startswith('image/'):
-                    image_data = await attachment.read()
-                    import io
-                    from PIL import Image
-                    input_image = Image.open(io.BytesIO(image_data))
+                    input_image_bytes = await attachment.read()
+                    input_mime_type = attachment.content_type
             
             # 2. Check for Saved Face
             elif os.path.exists(os.path.join(IMAGES_DIR, f"{uid}.png")):
                 import io
-                from PIL import Image
-                input_image = Image.open(os.path.join(IMAGES_DIR, f"{uid}.png"))
+                with open(os.path.join(IMAGES_DIR, f"{uid}.png"), "rb") as f:
+                    input_image_bytes = f.read()
+                input_mime_type = "image/png"
                 await ctx.send("📂 **Using saved face reference...**")
             
-            if not input_image:
+            if not input_image_bytes:
                  await ctx.send("⚠️ **No Face Found!** Attach a photo or use `!save_face` first.")
                  return
 
             await ctx.send("🎨 **Analyzing & transforming...**")
 
-            # 2. Run Generation
+            # 3. Run Generation
             img_bytes, ext = await asyncio.to_thread(image_generator.generate_avatar, instruction, input_image_bytes, input_mime_type)
             
             if img_bytes:
@@ -997,7 +996,7 @@ async def snapshot(ctx):
             "describe the scene for an image generator. "
             "Focus on lighting, atmosphere, and fantasy armor. "
             "Avoid explicit anatomy; focus on the romantic tension and facial expressions. "
-            "Style: Fantasy Oil Painting."
+            "Style: Digital Fantasy Art, Painterly, Cinematic Lighting."
         )
         
         try:
@@ -1005,25 +1004,13 @@ async def snapshot(ctx):
             desc_resp = await asyncio.to_thread(
                 client.models.generate_content, 
                 model=MODEL_ID, 
-                contents=prompt
+                contents=prompt, 
+                config=text_only_config
             )
             scene_description = desc_resp.text
             await ctx.send(f"🎨 **Painting the scene:** _{scene_description[:150]}..._")
-
+            
             # 2. Generate Image (Visual)
-            import io
-            
-            # Using the specific image generation model verified in tests
-            image_resp = await asyncio.to_thread(
-                client.models.generate_content,
-                model='gemini-2.5-flash-image',
-                contents=[scene_description]
-            )
-            
-            # Extract and send image
-            # Extract and send image
-            if image_resp.parts:
-                for part in image_resp.parts:
                     if part.inline_data:
                         # Use raw bytes directly to avoid PIL save() signature issues
                         image_bytes = part.inline_data.data
