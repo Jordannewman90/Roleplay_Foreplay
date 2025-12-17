@@ -204,9 +204,102 @@ text_only_config = types.GenerateContentConfig(
 # If /data exists (Railway Volume), use it. Otherwise use local folder.
 DATA_DIR = "/data" if os.path.exists("/data") else "."
 STATE_FILE = os.path.join(DATA_DIR, "campaign_state.json")
+IMAGES_DIR = os.path.join(DATA_DIR, "player_images")
 RULES_FILE = "rules.json"
 
-# Global State
+# Ensure images directory exists
+if not os.path.exists(IMAGES_DIR):
+    os.makedirs(IMAGES_DIR)
+
+# ... (Global State etc) ...
+
+# ... (Previous Commands) ...
+
+@bot.command()
+async def save_face(ctx):
+    """Save your appearance. Attach a photo! Usage: !save_face"""
+    if not ctx.message.attachments:
+        await ctx.send("⚠️ **Missing Photo:** Please attach an image to save your look!")
+        return
+        
+    attachment = ctx.message.attachments[0]
+    if not attachment.content_type.startswith('image/'):
+        await ctx.send("⚠️ That doesn't look like an image.")
+        return
+
+    uid = str(ctx.author.id)
+    file_path = os.path.join(IMAGES_DIR, f"{uid}.png")
+    
+    try:
+        await attachment.save(file_path)
+        await ctx.send("💾 **Face Saved!** I'll use this for future avatars if you don't attach a new one.")
+    except Exception as e:
+        await ctx.send(f"⚠️ Error saving face: {e}")
+
+@bot.command()
+async def avatar(ctx, *, instruction: str = "Make me a fantasy character"):
+    """Transformation! Attach a photo OR use saved face. Usage: !avatar [style instructions]"""
+    
+    uid = str(ctx.author.id)
+    input_image = None
+    
+    async with ctx.typing():
+        try:
+            # 1. Check for Attachment
+            if ctx.message.attachments:
+                attachment = ctx.message.attachments[0]
+                if attachment.content_type.startswith('image/'):
+                    image_data = await attachment.read()
+                    import io
+                    from PIL import Image
+                    input_image = Image.open(io.BytesIO(image_data))
+            
+            # 2. Check for Saved Face
+            elif os.path.exists(os.path.join(IMAGES_DIR, f"{uid}.png")):
+                import io
+                from PIL import Image
+                input_image = Image.open(os.path.join(IMAGES_DIR, f"{uid}.png"))
+                await ctx.send("📂 **Using saved face reference...**")
+            
+            if not input_image:
+                 await ctx.send("⚠️ **No Face Found!** Attach a photo or use `!save_face` first.")
+                 return
+
+            await ctx.send("🎨 **Analyzing & transforming...**")
+
+            # Create Prompt
+            prompt_text = (
+                f"Transform this person into a high-quality fantasy character portrait. {instruction}. "
+                "Keep the facial features recognizable but styled like a heroic oil painting or D&D concept art. "
+                "High detail, dramatic lighting."
+            )
+
+            # Generate Content with Image + Text
+            response = await asyncio.to_thread(
+                client.models.generate_content,
+                model='gemini-2.5-flash-image',
+                contents=[prompt_text, input_image]
+            )
+
+            # Extract Result
+            generated_image = None
+            if response.parts:
+                for part in response.parts:
+                    if part.inline_data:
+                        generated_image = part.as_image()
+                        break
+            
+            if generated_image:
+                import io
+                with io.BytesIO() as output_binary:
+                    generated_image.save(output_binary, 'PNG')
+                    output_binary.seek(0)
+                    await ctx.send(f"✨ **Avatar Generated:** '{instruction}'", file=discord.File(fp=output_binary, filename='avatar.png'))
+            else:
+                 await ctx.send("⚠️ The arcane energies failed to weave an image form.")
+
+        except Exception as e:
+            await ctx.send(f"⚠️ Avatar Error: {e}")
 creation_sessions = {}
 players = {}
 RULES = {}
@@ -839,63 +932,7 @@ async def snapshot(ctx):
             await ctx.send(f"⚠️ Snapshot Error: {e}")
             return
 
-@bot.command()
-async def avatar(ctx, *, instruction: str = "Make me a fantasy character"):
-    """Transformation! Attach a photo + use command. Usage: !avatar [style instructions]"""
-    if not ctx.message.attachments:
-        await ctx.send("⚠️ **Missing Photo:** Please attach a selfie or image with this command!")
-        return
 
-    async with ctx.typing():
-        try:
-            attachment = ctx.message.attachments[0]
-            if not attachment.content_type.startswith('image/'):
-                await ctx.send("⚠️ That doesn't look like an image.")
-                return
-
-            # Download the image
-            image_data = await attachment.read()
-            
-            # Convert to PIL Image for Google SDK
-            import io
-            from PIL import Image
-            input_image = Image.open(io.BytesIO(image_data))
-
-            await ctx.send("🎨 **Analyzing & transforming...** (This might take a moment)")
-
-            # Create Prompt
-            # We combine the user's instruction with the image
-            prompt_text = (
-                f"Transform this person into a high-quality fantasy character portrait. {instruction}. "
-                "Keep the facial features recognizable but styled like a heroic oil painting or D&D concept art. "
-                "High detail, dramatic lighting."
-            )
-
-            # Generate Content with Image + Text
-            response = await asyncio.to_thread(
-                client.models.generate_content,
-                model='gemini-2.5-flash-image',
-                contents=[prompt_text, input_image]
-            )
-
-            # Extract Result
-            generated_image = None
-            if response.parts:
-                for part in response.parts:
-                    if part.inline_data:
-                        generated_image = part.as_image()
-                        break
-            
-            if generated_image:
-                with io.BytesIO() as output_binary:
-                    generated_image.save(output_binary, 'PNG')
-                    output_binary.seek(0)
-                    await ctx.send(f"✨ **Avatar Generated:** '{instruction}'", file=discord.File(fp=output_binary, filename='avatar.png'))
-            else:
-                 await ctx.send("⚠️ The arcane energies failed to weave an image form.")
-
-        except Exception as e:
-            await ctx.send(f"⚠️ Avatar Error: {e}")
                 with io.BytesIO() as image_binary:
                     generated_image.save(image_binary, 'PNG')
                     image_binary.seek(0)
