@@ -23,7 +23,7 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 
 # Gemini Setup
 client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
-MODEL_ID = 'gemini-1.5-pro-002'
+MODEL_ID = 'gemini-1.5-pro' # Stable alias (fixed 404 on -002)
 
 # Tool Definition
 dice_tool = types.Tool(
@@ -257,6 +257,10 @@ async def backup_to_drive():
     if not raw_creds or not folder_id:
         print("[INFO] Drive Backup Skipped (Missing Credentials).")
         return "Backup skipped (Check logs)."
+
+    if not os.path.exists(STATE_FILE):
+        print("[INFO] Drive Backup Skipped (No local state file yet).")
+        return "Backup skipped (New Game)."
 
     print("[INFO] Starting Google Drive Backup...")
     try:
