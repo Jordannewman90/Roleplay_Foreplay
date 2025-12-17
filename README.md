@@ -8,6 +8,19 @@ It combines legitimate tabletop RPG mechanics (stats, dice rolling, combat) with
 
 ## ✨ Key Features
 
+## ✨ Key Features
+
+### 🎬 Cinematic Gameplay
+*   **Narrative First:** No more boring stats. `!fight` triggers a dramatic opening scene, and resting (`!rest`) starts a cozy campfire roleplay moment.
+*   **Natural Language Trigger:** You don't need commands. Just tell the bot "I attack the goblin" or "I want to pitch a tent," and it instinctively knows what to do.
+*   **"The Legend":** Type `!legend` to hear a bardic retelling of your entire campaign so far.
+
+### 💰 Economy & Progression (Lite)
+*   **Gold Logic:** The AI tracks your purse. Buy ales, bribe guards, or purchase magic items naturally in chat.
+*   **XP & Leveling:** The DM awards XP for heroic deeds. Level up to gain HP and status.
+*   **Quest Log:** Never get lost. Use `!quests` to see your current objectives.
+*   **Deep Relationships:** NPCs remember how you treat them. `!relationships` shows if they are your Enemy, Friend, or Lover.
+
 ### 🧠 The "DM with Benefits"
 *   **Persona-Driven AI:** The bot isn't just a text generator; it's a character. It's mischievous, flirtatious, and competent. It wants you to adventure *and* get close.
 *   **Deep Memory:** Remembers the last **200 turns** of conversation, ensuring long-term storytelling continuity.
@@ -33,25 +46,28 @@ It combines legitimate tabletop RPG mechanics (stats, dice rolling, combat) with
 
 | Command | Description |
 | :--- | :--- |
+| Command | Description |
+| :--- | :--- |
 | `!start [premise]` | **Start a new campaign.** Optionally provide a premise (e.g. "Space pirates"), or let the AI invent one. |
 | `!create` | **Design your character.** Starts a chat session with the AI Consultant to build your new persona. |
-| `!sheet` | **View Character Sheet.** Shows Name, Race, Class, HP, and Stats. |
+| `!sheet` | **View Character Sheet.** Shows Health, Stats, Gold, Level, and Inventory. |
+| `!quests` | **Quest Log.** View active objectives tracked by the AI. |
+| `!relationships` | **Social Connections.** See how much NPCs like (or hate) you. |
+| `!legend` | **Cinematic Recap.** The AI narrates the "Epic Tale" of your hero so far. |
 | `!roll [expr]` | **Manual Dice Roll.** e.g., `!roll 1d20+5` or `!roll 4d6`. Uses true RNG. |
-| `!fight [monster]` | **Start Combat.** Example: `!fight Goblin`. Rolls initiatives and sets the scene. |
-| `!rest` | **Long Rest.** Fully restores HP and saves the game. |
+| `!fight [monster]` | **Start Combat.** Example: `!fight Goblin`. Triggers a cinematic encounter. |
+| `!rest` | **Long Rest.** Fully restores HP and starts a campground roleplay scene. |
 | `!backup` | **Cloud Save.** Manually uploads `campaign_state.json` to Google Drive immediately. |
 | `!catchup` | **Recap.** Prints the last 4 story turns in case you forgot where you left off. |
 | `!snapshot` | **Scene Painting.** Generates a vivid text description of the current scene. |
-| `!status` | **Debug Info.** Shows bot uptime and the DM's internal "thought process" (fun for peeking behind the curtain). |
+| `!status` | **Debug Info.** Shows bot uptime and the DM's internal "thought process". |
 | `!fix` | **Mind Wipe.** Clears the AI's short-term memory (useful if it gets stuck in a loop), but keeps character stats. |
 
 ---
 
 ## 🚀 The Roadmap / Future Fun Stuff
-*   **Relationship Tracking:** NPCs that have "Affection Points" and distinct relationship tiers (Strangers -> Lovers).
 *   **Image Generation 2.0:** Re-enabling actual image generation (Stable Diffusion or Imagen) for the `!snapshot` command.
 *   **Voice Mode:** investigating ways to add TTS (Text-to-Speech) so the DM can *speak* the sultry narrations.
-*   **Quest Log:** A persistent list of active quests and objectives managed by the AI.
 
 ---
 
