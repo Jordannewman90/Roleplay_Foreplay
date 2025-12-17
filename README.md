@@ -21,6 +21,11 @@ It combines legitimate tabletop RPG mechanics (stats, dice rolling, combat) with
 *   **Quest Log:** Never get lost. Use `!quests` to see your current objectives.
 *   **Deep Relationships:** NPCs remember how you treat them. `!relationships` shows if they are your Enemy, Friend, or Lover.
 
+### 👥 Multiplayer & Social
+*   **Tagging:** The AI knows who you are. It will tag you (`@User`) when it's your turn or when addressing you directly.
+*   **Contextual Pronouns:** Say "I kiss her" or "I heal him", and the bot intelligently figures out which other player you mean based on the session context.
+*   **Party Awareness:** The DM addresses the group as a whole or individuals based on the action.
+
 ### 🧠 The "DM with Benefits"
 *   **Persona-Driven AI:** The bot isn't just a text generator; it's a character. It's mischievous, flirtatious, and competent. It wants you to adventure *and* get close.
 *   **Deep Memory:** Remembers the last **200 turns** of conversation, ensuring long-term storytelling continuity.
