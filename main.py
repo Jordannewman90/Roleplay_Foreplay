@@ -147,9 +147,41 @@ gameplay_tool = types.Tool(
     ]
 )
 
+# Economy & Progression Tools
+economy_tool = types.Tool(
+    function_declarations=[
+        types.FunctionDeclaration(
+            name="update_inventory_gold",
+            description="Manage inventory and gold. Use for buying, selling, looting, or paying info.",
+            parameters=types.Schema(
+                type=types.Type.OBJECT,
+                properties={
+                    "items_added": types.Schema(type=types.Type.ARRAY, items=types.Schema(type=types.Type.STRING), description="List of items added"),
+                    "items_removed": types.Schema(type=types.Type.ARRAY, items=types.Schema(type=types.Type.STRING), description="List of items removed"),
+                    "gold_change": types.Schema(type=types.Type.INTEGER, description="Change in Gold (+ or -)"),
+                    "reason": types.Schema(type=types.Type.STRING, description="Reason (e.g. 'Bought sword', 'Looted chest')")
+                },
+                required=["gold_change"]
+            )
+        ),
+        types.FunctionDeclaration(
+            name="grant_xp",
+            description="Award XP to player. Check for level up.",
+            parameters=types.Schema(
+                type=types.Type.OBJECT,
+                properties={
+                    "amount": types.Schema(type=types.Type.INTEGER, description="XP Amount"),
+                    "reason": types.Schema(type=types.Type.STRING, description="Reason for XP")
+                },
+                required=["amount"]
+            )
+        )
+    ]
+)
+
 generate_config = types.GenerateContentConfig(
     safety_settings=safety_settings,
-    tools=[dice_tool, combat_tool, rest_tool, gameplay_tool],
+    tools=[dice_tool, combat_tool, rest_tool, gameplay_tool, economy_tool],
     temperature=0.9 # High creativity
 )
 
@@ -425,6 +457,91 @@ async def get_ai_response(user_input, user_name, uid):
                         config=generate_config
                     )
 
+                # --- ECONOMY & PROGRESSION TOOLS ---
+                elif call.name == "update_inventory_gold":
+                    args = call.args
+                    added = args.get("items_added", [])
+                    removed = args.get("items_removed", [])
+                    gold_delta = args.get("gold_change", 0)
+                    reason = args.get("reason", "Trade")
+                    
+                    if uid in players:
+                        # Init keys if missing (Migration)
+                        if "inventory" not in players[uid]: players[uid]["inventory"] = []
+                        if "gold" not in players[uid]: players[uid]["gold"] = 10 
+                        
+                        # Gold
+                        players[uid]["gold"] += gold_delta
+                        
+                        # Inventory
+                        for item in added:
+                            players[uid]["inventory"].append(item)
+                        
+                        for item in removed:
+                            # Fuzzy remove (remove first match)
+                            for inv_item in players[uid]["inventory"]:
+                                if item.lower() in inv_item.lower():
+                                    players[uid]["inventory"].remove(inv_item)
+                                    break
+                        
+                        save_state()
+                        res = f"Gold: {players[uid]['gold']} ({gold_delta}). Items: +{added} -{removed}."
+                    else:
+                        res = "Error: Player not found."
+                        
+                    print(f"[TOOL] {res}")
+                    response = await asyncio.to_thread(
+                        client.models.generate_content,
+                        model=MODEL_ID,
+                        contents=[
+                            types.Content(role="user", parts=[types.Part(text=prompt)]),
+                            response.candidates[0].content,
+                            types.Content(role="user", parts=[types.Part(function_response=types.FunctionResponse(name=call.name, response={'result': res}))])
+                        ],
+                        config=generate_config
+                    )
+
+                elif call.name == "grant_xp":
+                    args = call.args
+                    amt = args.get("amount", 0)
+                    reason = args.get("reason", "Adventure")
+                    
+                    if uid in players:
+                        # Init keys if missing
+                        if "xp" not in players[uid]: players[uid]["xp"] = 0
+                        if "level" not in players[uid]: players[uid]["level"] = 1
+                        
+                        players[uid]["xp"] += amt
+                        current_xp = players[uid]["xp"]
+                        current_lvl = players[uid]["level"]
+                        
+                        # Simple Leveling: Level * 1000 XP
+                        next_lvl_xp = current_lvl * 1000
+                        
+                        levelup_msg = ""
+                        if current_xp >= next_lvl_xp:
+                            players[uid]["level"] += 1
+                            players[uid]["hp_max"] += random.randint(4, 10) # Auto HP boost
+                            players[uid]["hp_current"] = players[uid]["hp_max"]
+                            levelup_msg = f"🎉 LEVEL UP! You are now Level {players[uid]['level']}! HP Increased."
+                        
+                        save_state()
+                        res = f"XP: {current_xp} (+{amt}) [{reason}]. {levelup_msg}"
+                    else:
+                        res = "Error: Player not found."
+                        
+                    print(f"[TOOL] {res}")
+                    response = await asyncio.to_thread(
+                        client.models.generate_content,
+                        model=MODEL_ID,
+                        contents=[
+                            types.Content(role="user", parts=[types.Part(text=prompt)]),
+                            response.candidates[0].content,
+                            types.Content(role="user", parts=[types.Part(function_response=types.FunctionResponse(name=call.name, response={'result': res}))])
+                        ],
+                        config=generate_config
+                    )
+
                 elif call.name == "take_long_rest":
                     # Execute Logic
                     if uid in players:
@@ -597,8 +714,11 @@ async def run_creation_step(message):
                             "hp_current": class_data['hit_die'] + 2,
                             "stats": sess['stats'],
                             "inventory": class_data['equipment'],
-                            "quests": [], # Initialize Empty
-                            "relationships": {} # Initialize Empty
+                            "quests": [], 
+                            "relationships": {},
+                            "gold": 10,  # Startup Capital
+                            "xp": 0,
+                            "level": 1
                         }
                         
                         save_state()
@@ -610,6 +730,7 @@ async def run_creation_step(message):
                             f"**{players[uid]['race']} {players[uid]['class']}**\n"
                             f"_{players[uid]['description']}_\n"
                             f"STATS: {players[uid]['stats']}\n"
+                            f"💰 Gold: 10 | 🌟 Level: 1\n"
                             f"(Type `!start` to begin adventure!)"
                         )
                         return
@@ -640,15 +761,33 @@ async def sheet(ctx):
     if p:
         desc = p.get('description', 'No description yet.')
         inv = ", ".join(p.get('inventory', [])) or "Empty"
+        gold = p.get('gold', 0)
+        lvl = p.get('level', 1)
+        xp = p.get('xp', 0)
         
         embed = f"📜 **{p['name']}** ({p['race']} {p['class']})\n" \
                 f"_{desc}_\n\n" \
                 f"❤️ **HP:** {p['hp_current']}/{p['hp_max']}\n" \
+                f"💰 **Gold:** {gold} | 🌟 **Level:** {lvl} ({xp} XP)\n" \
                 f"📊 **Stats:** {p['stats']}\n" \
                 f"🎒 **Inventory:** {inv}"
         await ctx.send(embed)
     else:
         await ctx.send("No character found. Type `!create`.")
+
+@bot.command()
+async def legend(ctx):
+    """Cinematic Recap of the Hero's Journey."""
+    async with ctx.typing():
+        uid = str(ctx.author.id)
+        # Ask AI to generate a bard-style song or tale
+        prompt = (
+            "SYSTEM: Generate a 'Legend' or 'Epic Tale' summary of the campaign so far. "
+            "Write it in the style of a bard telling a story at a tavern. "
+            "Focus on the hero's achievements, relationships, and current quest."
+        )
+        response = await get_ai_response(prompt, "System", uid)
+        await ctx.send(f"🎻 **The Legend of {ctx.author.display_name}**\n\n{response}")
 
 @bot.command()
 async def quests(ctx):
