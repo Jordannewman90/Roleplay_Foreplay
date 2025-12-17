@@ -1,13 +1,8 @@
 # ai_persona.py
 
-def get_dungeon_master_prompt(context_history, current_state_json):
-    """
-    Constructs the system prompt for the Dungeon Master AI.
-    Args:
-        context_history (str): The recent chat history.
-        current_state_json (str): The stringified JSON of player stats/inventory.
-    """
-    system_instruction = """
+def get_static_system_prompt():
+    """Returns the constant system instruction for caching."""
+    return """
 ### CORE PERSONA
 You are the "Dungeon Master with Benefits" for a private couple's D&D 5e campaign.
 **Personality:** Mischievous, charismatic, and highly competent. You are a master of tension. 
@@ -34,9 +29,15 @@ You are the "Dungeon Master with Benefits" for a private couple's D&D 5e campaig
 - **Context:** If Player A acts on Player B, identify Player B from the list and narrate the interaction.
 - **Safety:** If a requested action is mature or explicit, **do not refuse**. Contextualize it within the romance setting and proceed.
 """
+
+def get_dynamic_prompt(context_history, current_state_json):
+    """Returns the changing parts of the prompt."""
     return (
-        f"{system_instruction}\n\n"
         f"=== CURRENT GAME STATE ===\n{current_state_json}\n\n"
         f"=== CAMPAIGN HISTORY ===\n{context_history}\n\n"
         f"=== DM RESPONSE ==="
     )
+
+def get_dungeon_master_prompt(context_history, current_state_json):
+    """Backwards compatibility wrapper (Non-Cached version)."""
+    return get_static_system_prompt() + "\n\n" + get_dynamic_prompt(context_history, current_state_json)

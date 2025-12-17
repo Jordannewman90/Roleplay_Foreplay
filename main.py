@@ -18,6 +18,8 @@ import character_creator
 import campaign_crafter
 import image_generator
 import speech_generator
+import cache_manager
+import ai_persona # explicit import for access
 from utils import retry_with_backoff
 
 # --- CONFIGURATION ---
@@ -428,16 +430,43 @@ async def get_ai_response(user_input, user_name, uid):
     context_str = "\n".join(temp_history[-200:]) # Keep last 200
     current_state_json = json.dumps(players, indent=2)
     
-    prompt = get_dungeon_master_prompt(context_str, current_state_json)
+    # NEW: Caching Logic
+    # 1. Get Static Prompt
+    static_sys = ai_persona.get_static_system_prompt()
+    # 2. Get Dynamic Prompt
+    dynamic_prompt = ai_persona.get_dynamic_prompt(context_str, current_state_json)
     
+    # 3. Resolve Cache
+    try:
+        cache_name = cache_manager.get_or_create_cache(static_sys)
+    except Exception as e:
+        print(f"[CACHE] Fallback due to error: {e}")
+        cache_name = None
+
     try:
         # First Turn: Send Prompt
-        response = await asyncio.to_thread(
-            client.models.generate_content,
-            model=MODEL_ID,
-            contents=prompt,
-            config=generate_config
-        )
+        if cache_name:
+            # Use Cached Content
+            response = await asyncio.to_thread(
+                client.models.generate_content,
+                model=MODEL_ID,
+                contents=dynamic_prompt, # Only send the new stuff!
+                config=types.GenerateContentConfig(
+                    cached_content=cache_name,
+                    safety_settings=safety_settings,
+                    tools=[dice_tool, combat_tool, rest_tool, gameplay_tool, economy_tool],
+                    temperature=0.9
+                )
+            )
+        else:
+             # Fallback to Full Prompt (No Cache)
+            full_prompt = ai_persona.get_dungeon_master_prompt(context_str, current_state_json)
+            response = await asyncio.to_thread(
+                client.models.generate_content,
+                model=MODEL_ID,
+                contents=full_prompt,
+                config=generate_config
+            )
 
         # CHECK FOR TOOL CALLS
         while response.function_calls:
