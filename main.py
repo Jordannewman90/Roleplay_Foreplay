@@ -14,7 +14,9 @@ from dotenv import load_dotenv
 from datetime import datetime
 from ai_persona import get_dungeon_master_prompt
 import dice_engine
+import dice_engine
 import character_creator
+from utils import retry_with_backoff
 
 # --- CONFIGURATION ---
 load_dotenv()
@@ -23,7 +25,7 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 
 # Gemini Setup
 client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
-MODEL_ID = 'gemini-2.0-flash' # Upgraded to 2.0 Flash (Available & Fast)
+MODEL_ID = 'gemini-1.5-pro' # Upgraded to Pro (Paid Tier - High Intelligence)
 
 # Tool Definition
 dice_tool = types.Tool(
@@ -298,6 +300,7 @@ async def weekly_backup_task():
 
 # --- AI NARRATOR ---
 # --- AI NARRATOR ---
+@retry_with_backoff(retries=3, initial_delay=4, factor=2)
 async def get_ai_response(user_input, user_name, uid):
     global last_thought, chat_history
     last_thought = f"Processing input from {user_name}..."
@@ -601,12 +604,13 @@ async def run_creation_step(message):
     
     async with message.channel.typing():
         try:
-            response = await asyncio.to_thread(
-                client.models.generate_content,
-                model=MODEL_ID,
-                contents=prompt,
-                config=creation_config
-            )
+            # Wrap the API call logic in an inner function or just apply retry to run_creation_step?
+            # Better to inline the retry logic or use the decorator on the API call specifically.
+            # But wait, we can't decorate a block. Let's make a helper or decorate the outer function.
+            # We'll decorate run_creation_step BUT wait, that's an event handler essentially.
+            # Better strategy: Wrap the specific api call here.
+            
+            response = await retry_generate_content(prompt, creation_config)
             
             # Check for Finalization Tool
             if response.function_calls:
@@ -870,5 +874,15 @@ async def on_command_error(ctx, error):
     else:
         print(f"[ERROR] Unhandled Error: {error}")
         await ctx.send(f"⚠️ **Error:** {error}")
+
+# Helper for decorated call
+@retry_with_backoff(retries=3, initial_delay=4, factor=2)
+async def retry_generate_content(prompt, config):
+    return await asyncio.to_thread(
+        client.models.generate_content,
+        model=MODEL_ID,
+        contents=prompt,
+        config=config
+    )
 
 bot.run(os.getenv("DISCORD_TOKEN"))
