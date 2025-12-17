@@ -436,9 +436,12 @@ async def get_ai_response(user_input, user_name, uid):
     # 2. Get Dynamic Prompt
     dynamic_prompt = ai_persona.get_dynamic_prompt(context_str, current_state_json)
     
+    # Define Tools List
+    all_tools = [dice_tool, combat_tool, rest_tool, gameplay_tool, economy_tool]
+
     # 3. Resolve Cache
     try:
-        cache_name = cache_manager.get_or_create_cache(static_sys)
+        cache_name = cache_manager.get_or_create_cache(static_sys, all_tools)
     except Exception as e:
         print(f"[CACHE] Fallback due to error: {e}")
         cache_name = None
@@ -454,7 +457,8 @@ async def get_ai_response(user_input, user_name, uid):
                 config=types.GenerateContentConfig(
                     cached_content=cache_name,
                     safety_settings=safety_settings,
-                    tools=[dice_tool, combat_tool, rest_tool, gameplay_tool, economy_tool],
+                    # Tools are implicit in cache, but we can re-specify if needed.
+                    # Best practice with 2.5 SDK: Don't re-send tools if cached.
                     temperature=0.9
                 )
             )
@@ -1087,17 +1091,13 @@ async def snapshot(ctx):
             await ctx.send(f"🎨 **Painting the scene:** _{scene_description[:150]}..._")
             
             # 2. Generate Image (Visual)
-                    if part.inline_data:
-                        # Use raw bytes directly to avoid PIL save() signature issues
-                        image_bytes = part.inline_data.data
-                        mime_type = part.inline_data.mime_type or "image/png"
-                        ext = "jpg" if "jpeg" in mime_type else "png"
-                        
-                        with io.BytesIO(image_bytes) as image_binary:
-                            await ctx.send(file=discord.File(fp=image_binary, filename=f'snapshot.{ext}'))
-                        return # Sent successfully
-
-            await ctx.send("⚠️ Image generation completed but no visual data returned.")
+            img_bytes, ext = await asyncio.to_thread(image_generator.generate_scene_image, scene_description)
+            
+            if img_bytes:
+                with io.BytesIO(img_bytes) as image_binary:
+                    await ctx.send(file=discord.File(fp=image_binary, filename=f'snapshot.{ext}'))
+            else:
+                await ctx.send(f"⚠️ Snapshot Failed: {ext}") # ext contains error message if failed
 
         except Exception as e:
             await ctx.send(f"⚠️ Snapshot Error: {e}")
