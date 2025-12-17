@@ -133,18 +133,15 @@ async def weekly_backup_task():
 # --- AI NARRATOR ---
 async def get_ai_response(user_input, user_name):
     global last_thought, chat_history
-    last_thought = f"Processing input from {user_name}: '{user_input}'..."
+    last_thought = f"Processing input from {user_name}..."
     
-    # Update History
-    chat_history.append(f"{user_name}: {user_input}")
+    # 1. Prepare temporary context (Don't commit to history yet)
+    temp_history = chat_history.copy()
+    temp_history.append(f"{user_name}: {user_input}")
     
-    # INCREASED MEMORY: Keep last 200 turns (Gemini Pro handles this easily)
-    context_str = "\n".join(chat_history[-200:])
-    
-    # SERIALIZE STATE: Convert players dict to string so AI can read it
+    context_str = "\n".join(temp_history[-200:]) # Keep last 200
     current_state_json = json.dumps(players, indent=2)
     
-    # PASS BOTH TO PROMPT FUNCTION
     prompt = get_dungeon_master_prompt(context_str, current_state_json)
     
     try:
@@ -155,17 +152,19 @@ async def get_ai_response(user_input, user_name):
             config=generate_config
         )
         text_response = response.text
+        
+        # 2. Success! Now commit both to history
+        chat_history.append(f"{user_name}: {user_input}")
+        chat_history.append(f"DM: {text_response}")
+        
+        last_thought = f"Waiting for next move."
+        return text_response
+        
     except Exception as e:
         print(f"[ERROR] AI Generation failed: {e}")
-        text_response = "⚠️ *The DM is feeling a bit overwhelmed (Rate Limit or Error). Give me a moment and try again!*"
         last_thought = f"Error: {e}"
-        return text_response
-    
-    # Add AI response to history
-    chat_history.append(f"DM: {text_response}")
-    
-    last_thought = f"Finished narrating for {user_name}. Waiting for next move."
-    return text_response
+        # Do NOT append to chat_history, so the user can try again without duplicate inputs
+        return "⚠️ *The DM is distracted (API Error). Please try saying that again.*"
 
 # --- COMMANDS ---
 
@@ -281,47 +280,48 @@ async def catchup(ctx):
 @bot.command()
 async def snapshot(ctx):
     """Generate a picture of the current scene."""
-    await ctx.send("⚠️ **Snapshot is currently disabled** to focus on the story!")
-    # async with ctx.typing():
-    #     # 1. Get a visual description from the text model
-    #     prompt = (
-    #         "Describe the current scene and characters for an image generator. "
-    #         "Focus on visual details: lighting, colors, character appearance, and action. "
-    #         "Keep it under 100 words. Make it atmospheric and match the current story context."
-    #     )
-    #     scene_description = await get_ai_response(prompt, "System")
+    async with ctx.typing():
+        # Step 1: Get a SFW description from the Text Model
+        # We explicitly ask for an 'Oil Painting' style to avoid photorealistic NSFW triggers
+        prompt = (
+            f"Based on the last message: '{chat_history[-1] if chat_history else ''}', "
+            "describe the scene for an image generator. "
+            "Focus on lighting, atmosphere, and fantasy armor. "
+            "Avoid explicit anatomy; focus on the romantic tension and facial expressions. "
+            "Style: Fantasy Oil Painting."
+        )
         
-    #     # 2. Generate Image
-    #     try:
-    #         result = await asyncio.to_thread(
-    #             imagen_model.generate_images,
-    #             prompt=scene_description,
-    #             number_of_images=1
-    #         )
-            
-    #         # 3. Save and Send
-    #         if result.images:
-    #             # Save locally temporarily
-    #             image_path = "snapshot.png"
-    #             result.images[0].save(image_path)
-                
-    #             # Send to Discord
-    #             file = discord.File(image_path, filename="snapshot.png")
-    #             await ctx.send(f"📸 **Snapshot:** {scene_description}", file=file)
-    #         else:
-    #             await ctx.send("⚠️ Failed to generate image (Safety filter or API error).")
-                
-    #     except Exception as e:
-    #         await ctx.send(f"⚠️ Image Generation Error: {e}")
+        try:
+            desc_resp = await asyncio.to_thread(
+                client.models.generate_content, 
+                model=MODEL_ID, 
+                contents=prompt
+            )
+            scene_description = desc_resp.text
+            await ctx.send(f"🎨 **Painting the scene:** _{scene_description[:150]}..._")
+        except Exception as e:
+            await ctx.send(f"⚠️ Snapshot Error: {e}")
+            return
+
+        # Step 2: Image Generation (Placeholder for Future Implementation)
+        # Note: Requires a valid visual model or external API. 
+        # For now, we provide the vivid text description.
 
 @bot.command()
 async def fix(ctx):
     """Clear AI short-term memory."""
+    global chat_history
+    chat_history.clear()
     await ctx.send("🧹 **Memory Cleaned.** (I still know your character stats, but context is reset).")
 
 @bot.event
 async def on_message(message):
     if message.author.bot: return
+
+    # 1. IGNORE OOC (Lines starting with // or >>)
+    if message.content.startswith("//") or message.content.startswith(">>"):
+        return
+
     uid = str(message.author.id)
 
     # Character Creation Logic
