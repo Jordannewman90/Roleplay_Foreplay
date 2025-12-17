@@ -799,6 +799,7 @@ async def snapshot(ctx):
         )
         
         try:
+            # 1. Get Scene Description (Text)
             desc_resp = await asyncio.to_thread(
                 client.models.generate_content, 
                 model=MODEL_ID, 
@@ -806,13 +807,105 @@ async def snapshot(ctx):
             )
             scene_description = desc_resp.text
             await ctx.send(f"🎨 **Painting the scene:** _{scene_description[:150]}..._")
+
+            # 2. Generate Image (Visual)
+            import io
+            
+            # Using the specific image generation model verified in tests
+            image_resp = await asyncio.to_thread(
+                client.models.generate_content,
+                model='gemini-2.5-flash-image',
+                contents=[scene_description]
+            )
+            
+            # Extract and send image
+            generated_image = None
+            if image_resp.parts:
+                for part in image_resp.parts:
+                    if part.inline_data:
+                        generated_image = part.as_image()
+                        break
+            
+            if generated_image:
+                # Save to buffer
+                with io.BytesIO() as image_binary:
+                    generated_image.save(image_binary, 'PNG')
+                    image_binary.seek(0)
+                    await ctx.send(file=discord.File(fp=image_binary, filename='snapshot.png'))
+            else:
+                await ctx.send("⚠️ Image generation completed but no visual data returned.")
+
         except Exception as e:
             await ctx.send(f"⚠️ Snapshot Error: {e}")
             return
 
-        # Step 2: Image Generation (Placeholder for Future Implementation)
-        # Note: Requires a valid visual model or external API. 
-        # For now, we provide the vivid text description.
+@bot.command()
+async def avatar(ctx, *, instruction: str = "Make me a fantasy character"):
+    """Transformation! Attach a photo + use command. Usage: !avatar [style instructions]"""
+    if not ctx.message.attachments:
+        await ctx.send("⚠️ **Missing Photo:** Please attach a selfie or image with this command!")
+        return
+
+    async with ctx.typing():
+        try:
+            attachment = ctx.message.attachments[0]
+            if not attachment.content_type.startswith('image/'):
+                await ctx.send("⚠️ That doesn't look like an image.")
+                return
+
+            # Download the image
+            image_data = await attachment.read()
+            
+            # Convert to PIL Image for Google SDK
+            import io
+            from PIL import Image
+            input_image = Image.open(io.BytesIO(image_data))
+
+            await ctx.send("🎨 **Analyzing & transforming...** (This might take a moment)")
+
+            # Create Prompt
+            # We combine the user's instruction with the image
+            prompt_text = (
+                f"Transform this person into a high-quality fantasy character portrait. {instruction}. "
+                "Keep the facial features recognizable but styled like a heroic oil painting or D&D concept art. "
+                "High detail, dramatic lighting."
+            )
+
+            # Generate Content with Image + Text
+            response = await asyncio.to_thread(
+                client.models.generate_content,
+                model='gemini-2.5-flash-image',
+                contents=[prompt_text, input_image]
+            )
+
+            # Extract Result
+            generated_image = None
+            if response.parts:
+                for part in response.parts:
+                    if part.inline_data:
+                        generated_image = part.as_image()
+                        break
+            
+            if generated_image:
+                with io.BytesIO() as output_binary:
+                    generated_image.save(output_binary, 'PNG')
+                    output_binary.seek(0)
+                    await ctx.send(f"✨ **Avatar Generated:** '{instruction}'", file=discord.File(fp=output_binary, filename='avatar.png'))
+            else:
+                 await ctx.send("⚠️ The arcane energies failed to weave an image form.")
+
+        except Exception as e:
+            await ctx.send(f"⚠️ Avatar Error: {e}")
+                with io.BytesIO() as image_binary:
+                    generated_image.save(image_binary, 'PNG')
+                    image_binary.seek(0)
+                    await ctx.send(file=discord.File(fp=image_binary, filename='snapshot.png'))
+            else:
+                await ctx.send("⚠️ Image generation completed but no visual data returned.")
+
+        except Exception as e:
+            await ctx.send(f"⚠️ Snapshot Error: {e}")
+            return
 
 @bot.command()
 async def fix(ctx):

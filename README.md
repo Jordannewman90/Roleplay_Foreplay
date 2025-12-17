@@ -2,7 +2,7 @@
 
 **roleplay_foreplay** is your "Dungeon Master with Benefits"—a bespoke AI-powered Discord bot designed for private, couple-focused D&D 5e campaigns.
 
-It combines legitimate tabletop RPG mechanics (stats, dice rolling, combat) with an immersive, spicy, and romance-novel-worthy narrative driven by Google's **Gemini 2.5 Pro**.
+It combines legitimate tabletop RPG mechanics (stats, dice rolling, combat) with an immersive, spicy, and romance-novel-worthy narrative driven by Google's **Gemini 2.5 Pro** and **Gemini 2.5 Flash (for Images)**.
 
 ---
 
@@ -62,14 +62,15 @@ It combines legitimate tabletop RPG mechanics (stats, dice rolling, combat) with
 | `!rest` | **Long Rest.** Fully restores HP and starts a campground roleplay scene. |
 | `!backup` | **Cloud Save.** Manually uploads `campaign_state.json` to Google Drive immediately. |
 | `!catchup` | **Recap.** Prints the last 4 story turns in case you forgot where you left off. |
-| `!snapshot` | **Scene Painting.** Generates a vivid text description of the current scene. |
+| `!snapshot` | **Scene Painting.** Generates a vivid **Image** of the current scene (Using Gemini 2.5 Flash). |
+| `!avatar [style]` | **Selfie to Fantasy.** Attach a photo and use this command to transform yourself into a character. |
 | `!status` | **Debug Info.** Shows bot uptime and the DM's internal "thought process". |
 | `!fix` | **Mind Wipe.** Clears the AI's short-term memory (useful if it gets stuck in a loop), but keeps character stats. |
 
 ---
 
 ## 🚀 The Roadmap / Future Fun Stuff
-*   **Image Generation 2.0:** Re-enabling actual image generation (Stable Diffusion or Imagen) for the `!snapshot` command.
+*   **Image Generation 2.0:** ✅ NOW LIVE! `!snapshot` and `!avatar` use the new Gemini 2.5 Image model.
 *   **Voice Mode:** investigating ways to add TTS (Text-to-Speech) so the DM can *speak* the sultry narrations.
 
 ---
