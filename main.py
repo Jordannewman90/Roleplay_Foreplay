@@ -25,8 +25,7 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 
 # Gemini Setup
 client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
-MODEL_ID = 'gemini-1.5-pro' # Upgraded to Pro (Paid Tier - High Intelligence)
-
+MODEL_ID = 'gemini-1.5-pro-002' # Specific 002 Version (User Requested)
 # Tool Definition
 dice_tool = types.Tool(
     function_declarations=[
