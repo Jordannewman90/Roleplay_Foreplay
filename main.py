@@ -23,7 +23,7 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 
 # Gemini Setup
 client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
-MODEL_ID = 'gemini-1.5-pro' # Stable alias (fixed 404 on -002)
+MODEL_ID = 'gemini-2.0-flash' # Upgraded to 2.0 Flash (Available & Fast)
 
 # Tool Definition
 dice_tool = types.Tool(
