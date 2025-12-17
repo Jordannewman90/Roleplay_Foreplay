@@ -191,6 +191,12 @@ creation_config = types.GenerateContentConfig(
     temperature=1.0 # Max creativity for brainstorming
 )
 
+text_only_config = types.GenerateContentConfig(
+    safety_settings=safety_settings,
+    temperature=0.9
+    # NO TOOLS - Safe for pure text generation
+)
+
 # imagen_model = genai.GenerativeModel('nano-banana-pro-preview')
 
 # File Paths (Railway Persistence Logic)
@@ -529,22 +535,29 @@ async def start(ctx, *, premise=None):
     async with ctx.typing():
         if not premise:
             # Generate a random premise if none provided
+            # Use Text-Only Config to prevent tool call hallucinations
             premise_prompt = "Generate a short, exciting, and slightly spicy D&D 5e campaign premise for a couple. Include a hook for adventure and intimacy."
-            premise_resp = await asyncio.to_thread(client.models.generate_content, model=MODEL_ID, contents=premise_prompt, config=generate_config)
+            premise_resp = await asyncio.to_thread(
+                client.models.generate_content, 
+                model=MODEL_ID, 
+                contents=premise_prompt, 
+                config=text_only_config
+            )
             premise = premise_resp.text
 
         # Generate the opening narration
         prompt = (
             f"SYSTEM: You are starting a new campaign based on this premise: '{premise}'. "
-            "Set the scene. Describe the environment, the atmosphere (make it alluring), and where the characters are. "
+            "Check the 'CURRENT GAME STATE' JSON. There are multiple players. "
+            "Set the scene involving ALL characters listed in the state. "
+            "Describe the environment, the atmosphere (make it alluring), and where the characters are. "
             "End with a call to action or a question to the players."
         )
         
-        # Use a dummy UID for start since players might not be initialized, 
-        # BUT ideally we need to know who is playing. For now, use author ID.
         uid = str(ctx.author.id)
-        response = await get_ai_response(f"Start the campaign with premise: {premise}", "System", uid)
-        await ctx.send(f"📜 **The Adventure Begins...**\n\n**Premise:** {premise}\n\n{response}")
+        # We pass the prompt as the user input to get the DM response
+        response = await get_ai_response(prompt, "System", uid)
+        await ctx.send(f"⚔️ **The Adventure Begins...**\n\n**Premise:** _{premise}_\n\n{response}")
 
 @bot.command()
 async def create(ctx):
