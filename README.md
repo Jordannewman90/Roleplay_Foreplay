@@ -13,10 +13,14 @@ It combines legitimate tabletop RPG mechanics (stats, dice rolling, combat) with
 *   **Deep Memory:** Remembers the last **200 turns** of conversation, ensuring long-term storytelling continuity.
 *   **Context Aware:** Knows your HP, inventory, and current location at all times.
 
-### � True RNG Dice Engine
+### 💄 Conversational Character Creator
+*   **No More Forms:** Forget boring menus. Type `!create` to summon the **Fantasy Consultant**, a specialized AI persona who interviews you about your desires.
+*   **Lore & Look:** Discuss your character's vibe, appearance, and backstory naturally. "I want to be a scary demon lady" -> "Ah, a Tiefling Barbarian? Let's give you some horns..."
+*   **Auto-Finalization:** When you're happy, the Consultant automatically generates your sheet and saves it to the database.
+
+### 🎲 True RNG Dice Engine
 *   **No Hallucinations:** The AI uses a Python-based deterministic dice engine (`dice_engine.py`) for all rolls. It cannot "fake" or "guess" numbers.
 *   **Function Calling:** The AI instinctively knows when to roll. If you say "I attack," it calls the dice engine tool, gets a real result (e.g., `1d20+5 = 18`), and narrates the outcome based on that math.
-*   **Manual Rolls:** Use `!roll 2d20` to roll dice yourself if you trust your own luck.
 
 ### ⚔️ Expanded D&D 5e Rules
 *   **Full Roster:** Now supports all 12 Classes (including **Bard**, Paladin, Warlock) and 9 Races (including **Tiefling**, Dragonborn, Half-Orc).
@@ -30,7 +34,7 @@ It combines legitimate tabletop RPG mechanics (stats, dice rolling, combat) with
 | Command | Description |
 | :--- | :--- |
 | `!start [premise]` | **Start a new campaign.** Optionally provide a premise (e.g. "Space pirates"), or let the AI invent one. |
-| `!create` | **Create a character.** The bot walks you through rolling stats (4d6 drop lowest), picking a Race, and Class. |
+| `!create` | **Design your character.** Starts a chat session with the AI Consultant to build your new persona. |
 | `!sheet` | **View Character Sheet.** Shows Name, Race, Class, HP, and Stats. |
 | `!roll [expr]` | **Manual Dice Roll.** e.g., `!roll 1d20+5` or `!roll 4d6`. Uses true RNG. |
 | `!fight [monster]` | **Start Combat.** Example: `!fight Goblin`. Rolls initiatives and sets the scene. |

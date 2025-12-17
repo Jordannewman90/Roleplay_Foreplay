@@ -14,6 +14,7 @@ from dotenv import load_dotenv
 from datetime import datetime
 from ai_persona import get_dungeon_master_prompt
 import dice_engine
+import character_creator
 
 # --- CONFIGURATION ---
 load_dotenv()
@@ -44,6 +45,27 @@ dice_tool = types.Tool(
     ]
 )
 
+# Character Creator Tool
+creation_tool = types.Tool(
+    function_declarations=[
+        types.FunctionDeclaration(
+            name="finalize_character",
+            description="Call this ONLY when the user is happy with their character and explicitly agrees to save it.",
+            parameters=types.Schema(
+                type=types.Type.OBJECT,
+                properties={
+                    "name": types.Schema(type=types.Type.STRING),
+                    "race_key": types.Schema(type=types.Type.STRING, description="The EXACT key from the rules list (e.g. 'tiefling', 'high_elf')."),
+                    "class_key": types.Schema(type=types.Type.STRING, description="The EXACT key from the rules list (e.g. 'bard', 'fighter')."),
+                    "description": types.Schema(type=types.Type.STRING, description="Physical appearance."),
+                    "lore": types.Schema(type=types.Type.STRING, description="Backstory and vibes.")
+                },
+                required=["name", "race_key", "class_key", "description", "lore"]
+            )
+        )
+    ]
+)
+
 # Define settings to allow the "Spicy" content
 # In google-genai, we use types.SafetySetting
 safety_settings = [
@@ -58,6 +80,13 @@ generate_config = types.GenerateContentConfig(
     tools=[dice_tool],
     temperature=0.9 # High creativity
 )
+
+creation_config = types.GenerateContentConfig(
+    safety_settings=safety_settings,
+    tools=[creation_tool], # Exclusive tool for creation mode
+    temperature=1.0 # Max creativity for brainstorming
+)
+
 # imagen_model = genai.GenerativeModel('nano-banana-pro-preview')
 
 # File Paths (Railway Persistence Logic)
@@ -259,18 +288,102 @@ async def start(ctx, *, premise=None):
 
 @bot.command()
 async def create(ctx):
-    """Start Character Creation."""
-    if str(ctx.author.id) in players:
+    """Start Character Creation (Conversational Mode)."""
+    uid = str(ctx.author.id)
+    if uid in players:
         await ctx.send("You already have a character! Type `!sheet`.")
         return
-    creation_sessions[str(ctx.author.id)] = {'step': 'ROLL'}
     
-    # Auto-roll stats immediately
+    # 1. Roll Stats in Background
     rolls = [sum(sorted([random.randint(1,6) for _ in range(4)])[1:]) for _ in range(6)]
-    creation_sessions[str(ctx.author.id)]['stats'] = sorted(rolls, reverse=True)
+    stats = sorted(rolls, reverse=True)
     
-    await ctx.send(f"🎲 **Stats Rolled:** {creation_sessions[str(ctx.author.id)]['stats']}\n"
-                   f"Next: Choose Race. Options: `{', '.join(RULES['races'].keys())}`")
+    # 2. Initialize Session
+    creation_sessions[uid] = {
+        'stats': stats,
+        'history': [] # Chat history for the consultant
+    }
+    
+    await ctx.send(f"🎲 **Stats Rolled:** {stats}\n"
+                   f"✨ **Summoning Character Consultant...**\n"
+                   f"_(A stylish projection appears)_ 'Darling, you look essentially formless. Let's fix that. What kind of fantasy are we building today?'")
+
+# --- CREATION LOOP ---
+async def run_creation_step(message):
+    uid = str(message.author.id)
+    sess = creation_sessions[uid]
+    user_input = message.content
+    
+    # Update History
+    sess['history'].append(f"User: {user_input}")
+    
+    # Build Prompt
+    history_str = "\n".join(sess['history'][-20:])
+    rules_str = json.dumps(RULES, indent=2)
+    prompt = character_creator.get_creation_prompt(history_str, rules_str)
+    
+    async with message.channel.typing():
+        try:
+            response = await asyncio.to_thread(
+                client.models.generate_content,
+                model=MODEL_ID,
+                contents=prompt,
+                config=creation_config
+            )
+            
+            # Check for Finalization Tool
+            if response.function_calls:
+                for call in response.function_calls:
+                    if call.name == "finalize_character":
+                        args = call.args
+                        
+                        # Validate Keys
+                        race_key = args['race_key'].lower()
+                        class_key = args['class_key'].lower()
+                        
+                        if race_key not in RULES['races'] or class_key not in RULES['classes']:
+                            sess['history'].append("System: Error - Invalid Race/Class Key. Consulting Rules...")
+                            # Retry (handled by loop or user input, but for now just warn)
+                            await message.channel.send("⚠️ Consultant Error: Invalid Race/Class selected. Please clarify.")
+                            return
+
+                        # SAVE CHARACTER
+                        race_data = RULES['races'][race_key]
+                        class_data = RULES['classes'][class_key]
+                        
+                        players[uid] = {
+                            "name": args['name'],
+                            "race": race_data['name'],
+                            "class": class_data['name'],
+                            "description": args['description'],
+                            "lore": args['lore'],
+                            "hp_max": class_data['hit_die'] + 2,
+                            "hp_current": class_data['hit_die'] + 2,
+                            "stats": sess['stats'],
+                            "inventory": class_data['equipment']
+                        }
+                        
+                        save_state()
+                        del creation_sessions[uid]
+                        
+                        await message.channel.send(
+                            f"🎉 **Character Saved!**\n"
+                            f"**Name:** {players[uid]['name']}\n"
+                            f"**{players[uid]['race']} {players[uid]['class']}**\n"
+                            f"_{players[uid]['description']}_\n"
+                            f"STATS: {players[uid]['stats']}\n"
+                            f"(Type `!start` to begin adventure!)"
+                        )
+                        return
+
+            # Normal Reply
+            text = response.text
+            sess['history'].append(f"Consultant: {text}")
+            await message.channel.send(text)
+            
+        except Exception as e:
+            print(f"[ERROR] Creation Loop: {e}")
+            await message.channel.send("⚠️ Consultant brain freeze. Try again.")
 
 @bot.command()
 async def fight(ctx, monster_name: str):
@@ -307,7 +420,10 @@ async def sheet(ctx):
     """View Character."""
     p = players.get(str(ctx.author.id))
     if p:
-        await ctx.send(f"📜 **{p['name']}** ({p['race']} {p['class']})\nHP: {p['hp_current']}/{p['hp_max']}\nStats: {p['stats']}")
+        desc = p.get('description', 'No description yet.')
+        await ctx.send(f"📜 **{p['name']}** ({p['race']} {p['class']})\n"
+                       f"_{desc}_\n"
+                       f"HP: {p['hp_current']}/{p['hp_max']}\nStats: {p['stats']}")
 
 @bot.command()
 async def recap(ctx):
@@ -388,35 +504,7 @@ async def on_message(message):
 
     # Character Creation Logic
     if uid in creation_sessions and not message.content.startswith("!"):
-        sess = creation_sessions[uid]
-        content = message.content.lower().strip().replace(" ", "_")
-        
-        if sess['step'] == 'ROLL': # Actually waiting for Race
-            if content in RULES['races']:
-                sess['race'] = RULES['races'][content]
-                sess['step'] = 'CLASS'
-                await message.channel.send(f"✅ Race: {sess['race']['name']}. Next: Choose Class.\nOptions: `{', '.join(RULES['classes'].keys())}`")
-            else:
-                await message.channel.send("⚠️ Invalid Race.")
-        
-        elif sess['step'] == 'CLASS':
-            if content in RULES['classes']:
-                cls = RULES['classes'][content]
-                # Finalize
-                players[uid] = {
-                    "name": message.author.display_name,
-                    "race": sess['race']['name'],
-                    "class": cls['name'],
-                    "hp_max": cls['hit_die'] + 2,
-                    "hp_current": cls['hit_die'] + 2,
-                    "stats": sess['stats'],
-                    "inventory": cls['equipment']
-                }
-                del creation_sessions[uid]
-                save_state()
-                await message.channel.send(f"🎉 **Character Saved!** Welcome, {players[uid]['race']} {players[uid]['class']}.")
-            else:
-                await message.channel.send("⚠️ Invalid Class.")
+        await run_creation_step(message)
         return
     
     # Allow natural language to trigger commands
