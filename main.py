@@ -1134,9 +1134,17 @@ async def on_message(message):
         return
     
     # Allow natural language to trigger commands
-    if message.content.lower().startswith("start game") or message.content.lower().startswith("begin adventure"):
+    msg_lower = message.content.lower().strip()
+    if msg_lower.startswith("start game") or msg_lower.startswith("begin adventure"):
         ctx = await bot.get_context(message)
         await start(ctx)
+        return
+        
+    # Natural Language for Narrate (including typos like 'narratem')
+    if "narrate" in msg_lower and ("bot" in msg_lower or len(msg_lower) < 15):
+        # Trigger if "narrate" is in a short message OR strictly addresses "bot"
+        ctx = await bot.get_context(message)
+        await narrate(ctx)
         return
 
     await bot.process_commands(message)
