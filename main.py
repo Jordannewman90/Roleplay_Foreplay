@@ -103,9 +103,53 @@ rest_tool = types.Tool(
     ]
 )
 
+# Relationship & Quest Tools
+gameplay_tool = types.Tool(
+    function_declarations=[
+        types.FunctionDeclaration(
+            name="update_quest",
+            description="Manage quests. Use when a quest is started, updated, or completed.",
+            parameters=types.Schema(
+                type=types.Type.OBJECT,
+                properties={
+                    "action": types.Schema(type=types.Type.STRING, description="One of: 'ADD', 'COMPLETE', 'FAIL'"),
+                    "quest_name": types.Schema(type=types.Type.STRING, description="Name/Objective of the quest"),
+                    "status": types.Schema(type=types.Type.STRING, description="Current status info (e.g. 'Goblin King dead')")
+                },
+                required=["action", "quest_name"]
+            )
+        ),
+        types.FunctionDeclaration(
+            name="add_loot",
+            description="Add item to player inventory.",
+            parameters=types.Schema(
+                type=types.Type.OBJECT,
+                properties={
+                    "item_name": types.Schema(type=types.Type.STRING, description="Name of the item"),
+                    "quantity": types.Schema(type=types.Type.INTEGER, description="Count (default 1)")
+                },
+                required=["item_name"]
+            )
+        ),
+        types.FunctionDeclaration(
+            name="update_relationship",
+            description="Update NPC affection score (0-100). Baseline is 0/50 depending on NPC.",
+            parameters=types.Schema(
+                type=types.Type.OBJECT,
+                properties={
+                    "npc_name": types.Schema(type=types.Type.STRING, description="Name of NPC"),
+                    "change": types.Schema(type=types.Type.INTEGER, description="Amount to change (+5, -10, etc.)"),
+                    "reason": types.Schema(type=types.Type.STRING, description="Why it changed")
+                },
+                required=["npc_name", "change"]
+            )
+        )
+    ]
+)
+
 generate_config = types.GenerateContentConfig(
     safety_settings=safety_settings,
-    tools=[dice_tool, combat_tool, rest_tool],
+    tools=[dice_tool, combat_tool, rest_tool, gameplay_tool],
     temperature=0.9 # High creativity
 )
 
@@ -289,6 +333,98 @@ async def get_ai_response(user_input, user_name, uid):
                         config=generate_config
                     )
 
+                    )
+
+                # --- GAMEPLAY TOOLS ---
+                elif call.name == "update_quest":
+                    args = call.args
+                    action = args.get("action")
+                    quest = args.get("quest_name")
+                    status = args.get("status", "")
+                    
+                    if uid in players:
+                        if "quests" not in players[uid]: players[uid]["quests"] = []
+                        
+                        if action == "ADD":
+                            players[uid]["quests"].append(f"{quest} (Active) - {status}")
+                            res = f"Quest Added: {quest}"
+                        elif action == "COMPLETE":
+                            players[uid]["quests"] = [q for q in players[uid]["quests"] if quest not in q]
+                            players[uid]["quests"].append(f"{quest} (COMPLETED)")
+                            res = f"Quest Completed: {quest}"
+                        elif action == "FAIL":
+                            players[uid]["quests"] = [q for q in players[uid]["quests"] if quest not in q]
+                            players[uid]["quests"].append(f"{quest} (FAILED)")
+                            res = f"Quest Failed: {quest}"
+                        save_state()
+                    else:
+                        res = "Error: Player not found."
+                    
+                    print(f"[TOOL] {res}")
+                    response = await asyncio.to_thread(
+                        client.models.generate_content,
+                        model=MODEL_ID,
+                        contents=[
+                            types.Content(role="user", parts=[types.Part(text=prompt)]),
+                            response.candidates[0].content,
+                            types.Content(role="user", parts=[types.Part(function_response=types.FunctionResponse(name=call.name, response={'result': res}))])
+                        ],
+                        config=generate_config
+                    )
+
+                elif call.name == "add_loot":
+                    args = call.args
+                    item = args.get("item_name")
+                    qty = args.get("quantity", 1)
+                    
+                    if uid in players:
+                        if "inventory" not in players[uid]: players[uid]["inventory"] = []
+                        players[uid]["inventory"].append(f"{item} (x{qty})")
+                        save_state()
+                        res = f"Added {qty}x {item} to inventory."
+                    else:
+                        res = "Error: Player not found."
+
+                    print(f"[TOOL] {res}")
+                    response = await asyncio.to_thread(
+                        client.models.generate_content,
+                        model=MODEL_ID,
+                        contents=[
+                            types.Content(role="user", parts=[types.Part(text=prompt)]),
+                            response.candidates[0].content,
+                            types.Content(role="user", parts=[types.Part(function_response=types.FunctionResponse(name=call.name, response={'result': res}))])
+                        ],
+                        config=generate_config
+                    )
+
+                elif call.name == "update_relationship":
+                    args = call.args
+                    npc = args.get("npc_name")
+                    change = args.get("change")
+                    reason = args.get("reason")
+                    
+                    if uid in players:
+                        if "relationships" not in players[uid]: players[uid]["relationships"] = {}
+                        current = players[uid]["relationships"].get(npc, 0) # Default 0 (Neutral)
+                        new_score = max(0, min(100, current + change))
+                        players[uid]["relationships"][npc] = new_score
+                        save_state()
+                        res = f"{npc} Relationship: {current} -> {new_score} ({reason})"
+                    else:
+                        res = "Error: Player not found."
+
+                    print(f"[TOOL] {res}")
+                    response = await asyncio.to_thread(
+                        client.models.generate_content,
+                        model=MODEL_ID,
+                        contents=[
+                            types.Content(role="user", parts=[types.Part(text=prompt)]),
+                            response.candidates[0].content,
+                            types.Content(role="user", parts=[types.Part(function_response=types.FunctionResponse(name=call.name, response={'result': res}))])
+                        ],
+                        config=generate_config
+                    )
+
                 elif call.name == "take_long_rest":
                     # Execute Logic
                     if uid in players:
@@ -380,7 +516,10 @@ async def start(ctx, *, premise=None):
             "End with a call to action or a question to the players."
         )
         
-        response = await get_ai_response(f"Start the campaign with premise: {premise}", "System")
+        # Use a dummy UID for start since players might not be initialized, 
+        # BUT ideally we need to know who is playing. For now, use author ID.
+        uid = str(ctx.author.id)
+        response = await get_ai_response(f"Start the campaign with premise: {premise}", "System", uid)
         await ctx.send(f"📜 **The Adventure Begins...**\n\n**Premise:** {premise}\n\n{response}")
 
 @bot.command()
@@ -457,7 +596,9 @@ async def run_creation_step(message):
                             "hp_max": class_data['hit_die'] + 2,
                             "hp_current": class_data['hit_die'] + 2,
                             "stats": sess['stats'],
-                            "inventory": class_data['equipment']
+                            "inventory": class_data['equipment'],
+                            "quests": [], # Initialize Empty
+                            "relationships": {} # Initialize Empty
                         }
                         
                         save_state()
@@ -493,24 +634,70 @@ async def backup(ctx):
 
 @bot.command()
 async def sheet(ctx):
-    """View Character."""
-    p = players.get(str(ctx.author.id))
+    """View Character Sheet, Inventory, and Status."""
+    uid = str(ctx.author.id)
+    p = players.get(uid)
     if p:
         desc = p.get('description', 'No description yet.')
-        await ctx.send(f"📜 **{p['name']}** ({p['race']} {p['class']})\n"
-                       f"_{desc}_\n"
-                       f"HP: {p['hp_current']}/{p['hp_max']}\nStats: {p['stats']}")
+        inv = ", ".join(p.get('inventory', [])) or "Empty"
+        
+        embed = f"📜 **{p['name']}** ({p['race']} {p['class']})\n" \
+                f"_{desc}_\n\n" \
+                f"❤️ **HP:** {p['hp_current']}/{p['hp_max']}\n" \
+                f"📊 **Stats:** {p['stats']}\n" \
+                f"🎒 **Inventory:** {inv}"
+        await ctx.send(embed)
+    else:
+        await ctx.send("No character found. Type `!create`.")
+
+@bot.command()
+async def quests(ctx):
+    """View Active Quests."""
+    uid = str(ctx.author.id)
+    p = players.get(uid)
+    if p:
+        qs = p.get('quests', [])
+        if not qs:
+            await ctx.send("📭 **Quest Log Empty**\n_Example: 'Find the lost amulet'_")
+        else:
+            txt = "\n".join([f"🔹 {q}" for q in qs])
+            await ctx.send(f"🗺️ **Quest Log**\n{txt}")
+
+@bot.command()
+async def relationships(ctx):
+    """View NPC Relationships."""
+    uid = str(ctx.author.id)
+    p = players.get(uid)
+    if p:
+        rels = p.get('relationships', {})
+        if not rels:
+            await ctx.send("💔 **No Relationships yet.** (Talk to people!)")
+        else:
+            # Sort by affection
+            sorted_rels = sorted(rels.items(), key=lambda x: x[1], reverse=True)
+            txt = ""
+            for name, score in sorted_rels:
+                status = "😐 Neutral"
+                if score >= 90: status = "💍 Soulmate"
+                elif score >= 70: status = "😍 Lover"
+                elif score >= 50: status = "😊 Friend"
+                elif score <= 20: status = "😡 Enemy"
+                
+                txt += f"**{name}**: {score}/100 ({status})\n"
+                
+            await ctx.send(f"💕 **Relationships**\n{txt}")
 
 @bot.command()
 async def recap(ctx):
     """Ask AI for story summary."""
-    res = await get_ai_response("Recap please.", "System")
+    # Pass '0' or 'System' as default UID since recap usually doesn't change state
+    res = await get_ai_response("Recap please.", "System", "0")
     await ctx.send(f"📅 **Story So Far:**\n{res}")
 
 @bot.command()
 async def guide(ctx):
     """Ask the DM for a hint."""
-    res = await get_ai_response("I'm stuck, what should I do?", "System")
+    res = await get_ai_response("I'm stuck, what should I do?", "System", "0")
     await ctx.send(f"💡 **DM's Guide:**\n{res}")
 
 @bot.command()
