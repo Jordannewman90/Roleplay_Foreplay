@@ -306,6 +306,18 @@ RULES = {}
 chat_history = [] # List of strings: "Name: Message"
 start_time = datetime.now()
 last_thought = "Waiting for the adventure to begin..."
+from collections import deque
+DEBUG_LOG = deque(maxlen=20) # Store last 20 log messages
+
+def log_event(message):
+    """Log to console and global buffer."""
+    timestamp = datetime.now().strftime("%H:%M:%S")
+    entry = f"[{timestamp}] {message}"
+    print(entry)
+    DEBUG_LOG.append(entry)
+
+# Override print? No, just use log_event where critical.
+
 
 # --- DATA MANAGEMENT ---
 def load_data():
@@ -933,16 +945,7 @@ async def snapshot(ctx):
             return
 
 
-                with io.BytesIO() as image_binary:
-                    generated_image.save(image_binary, 'PNG')
-                    image_binary.seek(0)
-                    await ctx.send(file=discord.File(fp=image_binary, filename='snapshot.png'))
-            else:
-                await ctx.send("⚠️ Image generation completed but no visual data returned.")
 
-        except Exception as e:
-            await ctx.send(f"⚠️ Snapshot Error: {e}")
-            return
 
 @bot.command()
 async def fix(ctx):
@@ -990,19 +993,40 @@ async def roll(ctx, expression: str):
     else:
         await ctx.send(f"🎲 **Result:** {res['total']} (Rolls: {res['rolls']})")
 
+# ... in global scope ...
+
+@bot.command()
+async def logs(ctx):
+    """View recent debug logs (Admin)."""
+    # Simple check: only show if explicitly requested
+    if not DEBUG_LOG:
+        await ctx.send("📜 **Logs Empty.**")
+        return
+    
+    log_text = "\n".join(DEBUG_LOG)
+    # Discord limit is 2000 chars
+    if len(log_text) > 1900:
+        log_text = log_text[-1900:]
+    
+    await ctx.send(f"🛠️ **Recent Logs:**\n```\n{log_text}\n```")
+
 @bot.event
 async def on_command_error(ctx, error):
     """Global error handler for bot commands."""
     if isinstance(error, commands.MissingRequiredArgument):
         await ctx.send(f"⚠️ **Missing Argument:** `{error.param.name}` is required.")
     elif isinstance(error, commands.CommandNotFound):
-        pass # Ignore unknown commands (prevents spam if users type random stuff)
+        pass 
     elif isinstance(error, commands.CommandInvokeError):
+        log_event(f"Command Error: {error}")
         print(f"[ERROR] Command Error: {error}")
-        await ctx.send("⚠️ **Something went wrong.** (Check logs)")
+        await ctx.send("⚠️ **Something went wrong.** (Check !logs)")
     else:
+        log_event(f"Unhandled Error: {error}")
         print(f"[ERROR] Unhandled Error: {error}")
         await ctx.send(f"⚠️ **Error:** {error}")
+
+# ... (rest of file)
 
 # Helper for decorated call
 @retry_with_backoff(retries=3, initial_delay=4, factor=2)

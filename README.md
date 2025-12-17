@@ -65,6 +65,7 @@ It combines legitimate tabletop RPG mechanics (stats, dice rolling, combat) with
 | `!snapshot` | **Scene Painting.** Generates a vivid **Image** of the current scene (Using Gemini 2.5 Flash). |
 | `!avatar [style]` | **Selfie to Fantasy.** Attach a photo (or use saved face) to transform into a character. |
 | `!save_face` | **Upload Selfie.** Attach a photo to save it as your default for `!avatar`. |
+| `!logs` | **Debug Logs.** (Admin) View the last 20 internal errors or logs. |
 | `!status` | **Debug Info.** Shows bot uptime and the DM's internal "thought process". |
 | `!fix` | **Mind Wipe.** Clears the AI's short-term memory (useful if it gets stuck in a loop), but keeps character stats. |
 
