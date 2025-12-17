@@ -282,21 +282,20 @@ async def avatar(ctx, *, instruction: str = "Make me a fantasy character"):
             )
 
             # Extract Result
-            generated_image = None
             if response.parts:
                 for part in response.parts:
                     if part.inline_data:
-                        generated_image = part.as_image()
-                        break
-            
-            if generated_image:
-                import io
-                with io.BytesIO() as output_binary:
-                    generated_image.save(output_binary, 'PNG')
-                    output_binary.seek(0)
-                    await ctx.send(f"✨ **Avatar Generated:** '{instruction}'", file=discord.File(fp=output_binary, filename='avatar.png'))
-            else:
-                 await ctx.send("⚠️ The arcane energies failed to weave an image form.")
+                         # Use raw bytes directly
+                        image_bytes = part.inline_data.data
+                        mime_type = part.inline_data.mime_type or "image/png"
+                        ext = "jpg" if "jpeg" in mime_type else "png"
+                        
+                        import io
+                        with io.BytesIO(image_bytes) as output_binary:
+                            await ctx.send(f"✨ **Avatar Generated:** '{instruction}'", file=discord.File(fp=output_binary, filename=f'avatar.{ext}'))
+                        return
+
+            await ctx.send("⚠️ The arcane energies failed to weave an image form.")
 
         except Exception as e:
             await ctx.send(f"⚠️ Avatar Error: {e}")
@@ -924,21 +923,20 @@ async def snapshot(ctx):
             )
             
             # Extract and send image
-            generated_image = None
+            # Extract and send image
             if image_resp.parts:
                 for part in image_resp.parts:
                     if part.inline_data:
-                        generated_image = part.as_image()
-                        break
-            
-            if generated_image:
-                # Save to buffer
-                with io.BytesIO() as image_binary:
-                    generated_image.save(image_binary, 'PNG')
-                    image_binary.seek(0)
-                    await ctx.send(file=discord.File(fp=image_binary, filename='snapshot.png'))
-            else:
-                await ctx.send("⚠️ Image generation completed but no visual data returned.")
+                        # Use raw bytes directly to avoid PIL save() signature issues
+                        image_bytes = part.inline_data.data
+                        mime_type = part.inline_data.mime_type or "image/png"
+                        ext = "jpg" if "jpeg" in mime_type else "png"
+                        
+                        with io.BytesIO(image_bytes) as image_binary:
+                            await ctx.send(file=discord.File(fp=image_binary, filename=f'snapshot.{ext}'))
+                        return # Sent successfully
+
+            await ctx.send("⚠️ Image generation completed but no visual data returned.")
 
         except Exception as e:
             await ctx.send(f"⚠️ Snapshot Error: {e}")
