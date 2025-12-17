@@ -10,7 +10,9 @@ It combines legitimate tabletop RPG mechanics (stats, dice rolling, combat) with
 
 ### 🎬 Cinematic Gameplay
 *   **Narrative First:** No more boring stats. `!fight` triggers a dramatic opening scene, and resting (`!rest`) starts a cozy campfire roleplay moment.
-*   **Natural Language Trigger:** You don't need commands. Just tell the bot "I attack the goblin" or "I want to pitch a tent," and it instinctively knows what to do.
+*   **Natural Language Trigger:** You don't need commands. 
+    *   "I attack the goblin" -> Triggers combat/rolling.
+    *   "Bot narrate" or "Narratem" -> Triggers `!narrate` to read the last message aloud. 
 *   **"The Legend":** Type `!legend` to hear a bardic retelling of your entire campaign so far.
 
 ### 💰 Economy & Progression (Lite)
@@ -53,6 +55,8 @@ It combines legitimate tabletop RPG mechanics (stats, dice rolling, combat) with
 | :--- | :--- |
 | `!start` | **Start Campaign.** Begins the adventure using your generated World or a random one. |
 | `!world` | **World Architect.** Design your own setting, villains, and rules interactively before starting. |
+| `!narrate` | **Narrate Story.** Reads the last DM response aloud (Audio). |
+| `!speak [text]` | **Speak.** Forces the AI to say the provided text aloud. |
 | `!create` | **Design your character.** Starts a chat session with the AI Consultant to build your new persona. |
 | `!sheet` | **View Character Sheet.** Shows Health, Stats, Gold, Level, and Inventory. |
 | `!quests` | **Quest Log.** View active objectives tracked by the AI. |
@@ -72,9 +76,13 @@ It combines legitimate tabletop RPG mechanics (stats, dice rolling, combat) with
 
 ---
 
+### ⚡ Performance & Caching
+*   **Context Caching:** To reduce costs and latency, the bot caches its massive rules, persona, and world bible (Static Context) using **Gemini Context Caching**.
+*   **Version Hashing:** Any changes to the persona automatically trigger a new cache version, ensuring your DM is always up to date.
+
 ## 🚀 The Roadmap / Future Fun Stuff
 *   **Image Generation 2.0:** ✅ NOW LIVE! `!snapshot` and `!avatar` use the new Gemini 2.5 Image model.
-*   **Voice Mode:** investigating ways to add TTS (Text-to-Speech) so the DM can *speak* the sultry narrations.
+*   **Voice Mode:** ✅ NOW LIVE! The DM can now `!narrate` scenes or `!speak` custom lines using Gemini 2.5 Flash TTS.
 
 ---
 
