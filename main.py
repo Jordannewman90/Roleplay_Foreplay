@@ -13,6 +13,7 @@ from googleapiclient.http import MediaFileUpload
 from dotenv import load_dotenv
 from datetime import datetime
 from ai_persona import get_dungeon_master_prompt
+import dice_engine
 
 # --- CONFIGURATION ---
 load_dotenv()
@@ -22,6 +23,26 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 # Gemini Setup
 client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 MODEL_ID = 'gemini-1.5-pro-002'
+
+# Tool Definition
+dice_tool = types.Tool(
+    function_declarations=[
+        types.FunctionDeclaration(
+            name="roll_dice",
+            description="Rolls dice using true RNG. Use this WHENEVER a die roll is needed for combat, checks, or random events.",
+            parameters=types.Schema(
+                type=types.Type.OBJECT,
+                properties={
+                    "expression": types.Schema(
+                        type=types.Type.STRING,
+                        description="The dice expression to roll (e.g., '1d20+5', '2d6', '1d8-1')."
+                    )
+                },
+                required=["expression"]
+            )
+        )
+    ]
+)
 
 # Define settings to allow the "Spicy" content
 # In google-genai, we use types.SafetySetting
@@ -33,7 +54,9 @@ safety_settings = [
 ]
 
 generate_config = types.GenerateContentConfig(
-    safety_settings=safety_settings
+    safety_settings=safety_settings,
+    tools=[dice_tool],
+    temperature=0.9 # High creativity
 )
 # imagen_model = genai.GenerativeModel('nano-banana-pro-preview')
 
@@ -145,16 +168,55 @@ async def get_ai_response(user_input, user_name):
     prompt = get_dungeon_master_prompt(context_str, current_state_json)
     
     try:
+        # First Turn: Send Prompt
         response = await asyncio.to_thread(
             client.models.generate_content,
             model=MODEL_ID,
             contents=prompt,
             config=generate_config
         )
+
+        # CHECK FOR TOOL CALLS
+        # The new SDK handles function calling by returning parts with function_call
+        # We need to loop if the model wants to call tools.
+        
+        while response.function_calls:
+            for call in response.function_calls:
+                if call.name == "roll_dice":
+                    # Execute locally
+                    args = call.args
+                    expression = args.get("expression", "1d20")
+                    print(f"[TOOL] AI requested roll: {expression}")
+                    
+                    result = dice_engine.roll_dice(expression)
+                    
+                    # Feed back to model
+                    # Create a FunctionResponse part
+                    # In new SDK, we send the new content back with the function response
+                    response = await asyncio.to_thread(
+                        client.models.generate_content,
+                        model=MODEL_ID,
+                        contents=[
+                            types.Content(role="user", parts=[types.Part(text=prompt)]), # Original prompt context
+                            response.candidates[0].content, # The model's request
+                            types.Content(role="user", parts=[
+                                types.Part(
+                                    function_response=types.FunctionResponse(
+                                        name="roll_dice",
+                                        response=result
+                                    )
+                                )
+                            ])
+                        ],
+                        config=generate_config
+                    )
+
         text_response = response.text
         
         # 2. Success! Now commit both to history
         chat_history.append(f"{user_name}: {user_input}")
+        # Optionally explicitly mention rolls in history if not already in text_response? 
+        # Usually the model sees the result and writes it into the text.
         chat_history.append(f"DM: {text_response}")
         
         last_thought = f"Waiting for next move."
@@ -371,6 +433,15 @@ async def on_message(message):
             response = await get_ai_response(message.content, message.author.display_name)
             await message.channel.send(response)
             save_state() # SAVE IMMEDIATELY
+
+@bot.command()
+async def roll(ctx, expression: str):
+    """Roll dice manually (e.g. !roll 2d20)."""
+    res = dice_engine.roll_dice(expression)
+    if "error" in res:
+        await ctx.send(f"⚠️ {res['error']}")
+    else:
+        await ctx.send(f"🎲 **Result:** {res['total']} (Rolls: {res['rolls']})")
 
 @bot.event
 async def on_command_error(ctx, error):
