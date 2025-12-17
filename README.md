@@ -51,7 +51,8 @@ It combines legitimate tabletop RPG mechanics (stats, dice rolling, combat) with
 | :--- | :--- |
 | Command | Description |
 | :--- | :--- |
-| `!start [premise]` | **Start a new campaign.** Optionally provide a premise (e.g. "Space pirates"), or let the AI invent one. |
+| `!start` | **Start Campaign.** Begins the adventure using your generated World or a random one. |
+| `!world` | **World Architect.** Design your own setting, villains, and rules interactively before starting. |
 | `!create` | **Design your character.** Starts a chat session with the AI Consultant to build your new persona. |
 | `!sheet` | **View Character Sheet.** Shows Health, Stats, Gold, Level, and Inventory. |
 | `!quests` | **Quest Log.** View active objectives tracked by the AI. |
