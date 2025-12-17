@@ -4,14 +4,15 @@ import random
 import asyncio
 import discord
 from discord.ext import commands, tasks
-import google.generativeai as genai
+
+from google import genai
+from google.genai import types
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
 from dotenv import load_dotenv
 from datetime import datetime
 from ai_persona import get_dungeon_master_prompt
-from google.generativeai.types import HarmCategory, HarmBlockThreshold
 
 # --- CONFIGURATION ---
 load_dotenv()
@@ -19,19 +20,19 @@ intents = discord.Intents.all()
 bot = commands.Bot(command_prefix="!", intents=intents)
 
 # Gemini Setup
-genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
+client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
+MODEL_ID = 'gemini-1.5-pro-002'
 
 # Define settings to allow the "Spicy" content
-safety_settings = {
-    HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: HarmBlockThreshold.BLOCK_NONE,
-    HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_ONLY_HIGH,
-    HarmCategory.HARM_CATEGORY_HATE_SPEECH: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
-    HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
-}
+# In google-genai, we use types.SafetySetting
+safety_settings = [
+    types.SafetySetting(category=types.HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold=types.HarmBlockThreshold.BLOCK_NONE),
+    types.SafetySetting(category=types.HarmCategory.HARM_CATEGORY_HARASSMENT, threshold=types.HarmBlockThreshold.BLOCK_ONLY_HIGH),
+    types.SafetySetting(category=types.HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold=types.HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE),
+    types.SafetySetting(category=types.HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold=types.HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE),
+]
 
-# Use 1.5 Pro for better memory/logic (or keep 2.5 Flash if speed is priority)
-model = genai.GenerativeModel(
-    model_name='gemini-1.5-pro-002', # Highly recommended over Flash for D&D logic
+generate_config = types.GenerateContentConfig(
     safety_settings=safety_settings
 )
 # imagen_model = genai.GenerativeModel('nano-banana-pro-preview')
@@ -147,7 +148,12 @@ async def get_ai_response(user_input, user_name):
     prompt = get_dungeon_master_prompt(context_str, current_state_json)
     
     try:
-        response = await asyncio.to_thread(model.generate_content, prompt)
+        response = await asyncio.to_thread(
+            client.models.generate_content,
+            model=MODEL_ID,
+            contents=prompt,
+            config=generate_config
+        )
         text_response = response.text
     except Exception as e:
         print(f"[ERROR] AI Generation failed: {e}")
@@ -177,8 +183,8 @@ async def start(ctx, *, premise=None):
         if not premise:
             # Generate a random premise if none provided
             premise_prompt = "Generate a short, exciting, and slightly spicy D&D 5e campaign premise for a couple. Include a hook for adventure and intimacy."
-            premise = await asyncio.to_thread(model.generate_content, premise_prompt)
-            premise = premise.text
+            premise_resp = await asyncio.to_thread(client.models.generate_content, model=MODEL_ID, contents=premise_prompt, config=generate_config)
+            premise = premise_resp.text
 
         # Generate the opening narration
         prompt = (
@@ -365,5 +371,19 @@ async def on_message(message):
             response = await get_ai_response(message.content, message.author.display_name)
             await message.channel.send(response)
             save_state() # SAVE IMMEDIATELY
+
+@bot.event
+async def on_command_error(ctx, error):
+    """Global error handler for bot commands."""
+    if isinstance(error, commands.MissingRequiredArgument):
+        await ctx.send(f"⚠️ **Missing Argument:** `{error.param.name}` is required.")
+    elif isinstance(error, commands.CommandNotFound):
+        pass # Ignore unknown commands (prevents spam if users type random stuff)
+    elif isinstance(error, commands.CommandInvokeError):
+        print(f"[ERROR] Command Error: {error}")
+        await ctx.send("⚠️ **Something went wrong.** (Check logs)")
+    else:
+        print(f"[ERROR] Unhandled Error: {error}")
+        await ctx.send(f"⚠️ **Error:** {error}")
 
 bot.run(os.getenv("DISCORD_TOKEN"))
