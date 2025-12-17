@@ -75,9 +75,37 @@ safety_settings = [
     types.SafetySetting(category=types.HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold=types.HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE),
 ]
 
+# Combat Tool
+combat_tool = types.Tool(
+    function_declarations=[
+        types.FunctionDeclaration(
+            name="start_combat",
+            description="Initiates combat with a monster. Returns initiatives and monster stats. Use when the user says 'I fight' or 'I attack'.",
+            parameters=types.Schema(
+                type=types.Type.OBJECT,
+                properties={
+                    "monster_name": types.Schema(type=types.Type.STRING, description="Name of the monster (e.g. 'Goblin')"),
+                },
+                required=["monster_name"]
+            )
+        )
+    ]
+)
+
+# Rest Tool
+rest_tool = types.Tool(
+    function_declarations=[
+        types.FunctionDeclaration(
+            name="take_long_rest",
+            description="Restores player HP and saves game. Use when user says 'I rest', 'camp', or 'sleep'.",
+            parameters=types.Schema(type=types.Type.OBJECT, properties={}, required=[])
+        )
+    ]
+)
+
 generate_config = types.GenerateContentConfig(
     safety_settings=safety_settings,
-    tools=[dice_tool],
+    tools=[dice_tool, combat_tool, rest_tool],
     temperature=0.9 # High creativity
 )
 
@@ -183,7 +211,8 @@ async def weekly_backup_task():
     await backup_to_drive()
 
 # --- AI NARRATOR ---
-async def get_ai_response(user_input, user_name):
+# --- AI NARRATOR ---
+async def get_ai_response(user_input, user_name, uid):
     global last_thought, chat_history
     last_thought = f"Processing input from {user_name}..."
     
@@ -206,35 +235,80 @@ async def get_ai_response(user_input, user_name):
         )
 
         # CHECK FOR TOOL CALLS
-        # The new SDK handles function calling by returning parts with function_call
-        # We need to loop if the model wants to call tools.
-        
         while response.function_calls:
             for call in response.function_calls:
                 if call.name == "roll_dice":
-                    # Execute locally
                     args = call.args
                     expression = args.get("expression", "1d20")
                     print(f"[TOOL] AI requested roll: {expression}")
-                    
                     result = dice_engine.roll_dice(expression)
                     
-                    # Feed back to model
-                    # Create a FunctionResponse part
-                    # In new SDK, we send the new content back with the function response
                     response = await asyncio.to_thread(
                         client.models.generate_content,
                         model=MODEL_ID,
                         contents=[
-                            types.Content(role="user", parts=[types.Part(text=prompt)]), # Original prompt context
-                            response.candidates[0].content, # The model's request
+                            types.Content(role="user", parts=[types.Part(text=prompt)]),
+                            response.candidates[0].content,
                             types.Content(role="user", parts=[
-                                types.Part(
-                                    function_response=types.FunctionResponse(
-                                        name="roll_dice",
-                                        response=result
-                                    )
-                                )
+                                types.Part(function_response=types.FunctionResponse(name=call.name, response=result))
+                            ])
+                        ],
+                        config=generate_config
+                    )
+
+                elif call.name == "start_combat":
+                    args = call.args
+                    monster_name = args.get("monster_name").lower()
+                    monster = RULES['monsters'].get(monster_name)
+                    
+                    if not monster:
+                        res = {"error": f"Monster '{monster_name}' not found. Available: {', '.join(RULES['monsters'].keys())}"}
+                    else:
+                        m_init = random.randint(1, 20) + monster['init_bonus']
+                        p_init = random.randint(1, 20)
+                        res = {
+                            "event": "COMBAT_STARTED",
+                            "monster": monster['name'],
+                            "monster_hp": monster['hp'],
+                            "monster_init": m_init,
+                            "player_init": p_init,
+                            "instruction": "Describe the monster's entrance cinematically. Mention who goes first."
+                        }
+                    
+                    print(f"[{call.name}] {res}")
+                    response = await asyncio.to_thread(
+                        client.models.generate_content,
+                        model=MODEL_ID,
+                        contents=[
+                            types.Content(role="user", parts=[types.Part(text=prompt)]),
+                            response.candidates[0].content,
+                            types.Content(role="user", parts=[
+                                types.Part(function_response=types.FunctionResponse(name=call.name, response=res))
+                            ])
+                        ],
+                        config=generate_config
+                    )
+
+                elif call.name == "take_long_rest":
+                    # Execute Logic
+                    if uid in players:
+                        players[uid]['hp_current'] = players[uid]['hp_max']
+                        save_state()
+                        
+                    res = {
+                        "event": "REST_COMPLETED",
+                        "instruction": "The party rests. HP is restored. Describe a cozy campfire scene and ask the player a deep question."
+                    }
+                    
+                    print(f"[{call.name}] {res}")
+                    response = await asyncio.to_thread(
+                        client.models.generate_content,
+                        model=MODEL_ID,
+                        contents=[
+                            types.Content(role="user", parts=[types.Part(text=prompt)]),
+                            response.candidates[0].content,
+                            types.Content(role="user", parts=[
+                                types.Part(function_response=types.FunctionResponse(name=call.name, response=res))
                             ])
                         ],
                         config=generate_config
@@ -244,8 +318,6 @@ async def get_ai_response(user_input, user_name):
         
         # 2. Success! Now commit both to history
         chat_history.append(f"{user_name}: {user_input}")
-        # Optionally explicitly mention rolls in history if not already in text_response? 
-        # Usually the model sees the result and writes it into the text.
         chat_history.append(f"DM: {text_response}")
         
         last_thought = f"Waiting for next move."
@@ -253,11 +325,36 @@ async def get_ai_response(user_input, user_name):
         
     except Exception as e:
         print(f"[ERROR] AI Generation failed: {e}")
+        text_response = "⚠️ *The DM is feeling a bit overwhelmed (Rate Limit or Error). Give me a moment and try again!*"
         last_thought = f"Error: {e}"
-        # Do NOT append to chat_history, so the user can try again without duplicate inputs
-        return "⚠️ *The DM is distracted (API Error). Please try saying that again.*"
+        return text_response
 
-# --- COMMANDS ---
+# ... (Previous code)
+
+@bot.command()
+async def fight(ctx, monster_name: str=""):
+    """Start Combat (Cinematic). Usage: !fight [monster]"""
+    # If no argument, maybe asking for list?
+    if not monster_name:
+        await ctx.send(f"⚠️ Usage: `!fight [Monster]`. Available: {', '.join(RULES['monsters'].keys())}")
+        return
+
+    async with ctx.typing():
+        # Invoke AI to handle the fight logic
+        uid = str(ctx.author.id)
+        response = await get_ai_response(f"(Command: Start Combat with {monster_name})", ctx.author.display_name, uid)
+        await ctx.send(response)
+        save_state()
+
+@bot.command()
+async def rest(ctx):
+    """Long Rest (Cinematic)."""
+    async with ctx.typing():
+        uid = str(ctx.author.id)
+        response = await get_ai_response(f"(Command: Take Long Rest)", ctx.author.display_name, uid)
+        await ctx.send(response)
+        save_state()
+
 
 @bot.event
 async def on_ready():
@@ -385,28 +482,7 @@ async def run_creation_step(message):
             print(f"[ERROR] Creation Loop: {e}")
             await message.channel.send("⚠️ Consultant brain freeze. Try again.")
 
-@bot.command()
-async def fight(ctx, monster_name: str):
-    """Roll Initiative vs a Monster."""
-    monster = RULES['monsters'].get(monster_name.lower())
-    if not monster:
-        await ctx.send(f"⚠️ Unknown monster. Try: {', '.join(RULES['monsters'].keys())}")
-        return
-    
-    m_init = random.randint(1, 20) + monster['init_bonus']
-    p_init = random.randint(1, 20)
-    await ctx.send(f"⚔️ **{monster['name']}** (HP: {monster['hp']}) appears!\n"
-                   f"Monster Init: {m_init} | Your Init: {p_init}\n"
-                   f"**{'You' if p_init >= m_init else 'Monster'} go first!**")
 
-@bot.command()
-async def rest(ctx):
-    """Full Heal."""
-    uid = str(ctx.author.id)
-    if uid in players:
-        players[uid]['hp_current'] = players[uid]['hp_max']
-        save_state()
-        await ctx.send(f"💤 **{players[uid]['name']}** takes a Long Rest. HP restored.")
 
 @bot.command()
 async def backup(ctx):
@@ -518,7 +594,7 @@ async def on_message(message):
     # Roleplay Logic
     if not message.content.startswith("!") and uid in players:
         async with message.channel.typing():
-            response = await get_ai_response(message.content, message.author.display_name)
+            response = await get_ai_response(message.content, message.author.display_name, uid)
             await message.channel.send(response)
             save_state() # SAVE IMMEDIATELY
 
