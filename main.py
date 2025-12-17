@@ -312,37 +312,27 @@ async def get_ai_response(user_input, user_name, uid):
 
         # CHECK FOR TOOL CALLS
         while response.function_calls:
+            print(f"[AI] Model requested {len(response.function_calls)} tools.")
+            
+            tool_response_parts = []
+            
             for call in response.function_calls:
+                function_result = {}
+                
                 if call.name == "roll_dice":
-                    args = call.args
-                    expression = args.get("expression", "1d20")
+                    expression = call.args.get("expression", "1d20")
                     print(f"[TOOL] AI requested roll: {expression}")
-                    result = dice_engine.roll_dice(expression)
-                    
-                    response = await asyncio.to_thread(
-                        client.models.generate_content,
-                        model=MODEL_ID,
-                        contents=[
-                            types.Content(role="user", parts=[types.Part(text=prompt)]),
-                            response.candidates[0].content,
-                            types.Content(role="user", parts=[
-                                types.Part(function_response=types.FunctionResponse(name=call.name, response=result))
-                            ])
-                        ],
-                        config=generate_config
-                    )
+                    function_result = dice_engine.roll_dice(expression)
 
                 elif call.name == "start_combat":
-                    args = call.args
-                    monster_name = args.get("monster_name").lower()
+                    monster_name = call.args.get("monster_name", "").lower()
                     monster = RULES['monsters'].get(monster_name)
-                    
                     if not monster:
-                        res = {"error": f"Monster '{monster_name}' not found. Available: {', '.join(RULES['monsters'].keys())}"}
+                        function_result = {"error": f"Monster '{monster_name}' not found. Available: {', '.join(RULES['monsters'].keys())}"}
                     else:
                         m_init = random.randint(1, 20) + monster['init_bonus']
                         p_init = random.randint(1, 20)
-                        res = {
+                        function_result = {
                             "event": "COMBAT_STARTED",
                             "monster": monster['name'],
                             "monster_hp": monster['hp'],
@@ -350,222 +340,139 @@ async def get_ai_response(user_input, user_name, uid):
                             "player_init": p_init,
                             "instruction": "Describe the monster's entrance cinematically. Mention who goes first."
                         }
-                    
-                    print(f"[{call.name}] {res}")
-                    response = await asyncio.to_thread(
-                        client.models.generate_content,
-                        model=MODEL_ID,
-                        contents=[
-                            types.Content(role="user", parts=[types.Part(text=prompt)]),
-                            response.candidates[0].content,
-                            types.Content(role="user", parts=[
-                                types.Part(function_response=types.FunctionResponse(name=call.name, response=res))
-                            ])
-                        ],
-                        config=generate_config
-                    )
 
-                    )
-
-                # --- GAMEPLAY TOOLS ---
                 elif call.name == "update_quest":
-                    args = call.args
-                    action = args.get("action")
-                    quest = args.get("quest_name")
-                    status = args.get("status", "")
+                    qt_args = call.args
+                    action = qt_args.get("action")
+                    quest = qt_args.get("quest_name")
+                    status = qt_args.get("status", "")
                     
                     if uid in players:
                         if "quests" not in players[uid]: players[uid]["quests"] = []
-                        
                         if action == "ADD":
                             players[uid]["quests"].append(f"{quest} (Active) - {status}")
-                            res = f"Quest Added: {quest}"
+                            res_str = f"Quest Added: {quest}"
                         elif action == "COMPLETE":
                             players[uid]["quests"] = [q for q in players[uid]["quests"] if quest not in q]
                             players[uid]["quests"].append(f"{quest} (COMPLETED)")
-                            res = f"Quest Completed: {quest}"
+                            res_str = f"Quest Completed: {quest}"
                         elif action == "FAIL":
                             players[uid]["quests"] = [q for q in players[uid]["quests"] if quest not in q]
                             players[uid]["quests"].append(f"{quest} (FAILED)")
-                            res = f"Quest Failed: {quest}"
+                            res_str = f"Quest Failed: {quest}"
                         save_state()
+                        function_result = {"result": res_str}
                     else:
-                        res = "Error: Player not found."
-                    
-                    print(f"[TOOL] {res}")
-                    response = await asyncio.to_thread(
-                        client.models.generate_content,
-                        model=MODEL_ID,
-                        contents=[
-                            types.Content(role="user", parts=[types.Part(text=prompt)]),
-                            response.candidates[0].content,
-                            types.Content(role="user", parts=[types.Part(function_response=types.FunctionResponse(name=call.name, response={'result': res}))])
-                        ],
-                        config=generate_config
-                    )
+                        function_result = {"result": "Error: Player not found."}
 
                 elif call.name == "add_loot":
-                    args = call.args
-                    item = args.get("item_name")
-                    qty = args.get("quantity", 1)
+                    lt_args = call.args
+                    item = lt_args.get("item_name")
+                    qty = lt_args.get("quantity", 1)
                     
                     if uid in players:
                         if "inventory" not in players[uid]: players[uid]["inventory"] = []
                         players[uid]["inventory"].append(f"{item} (x{qty})")
                         save_state()
-                        res = f"Added {qty}x {item} to inventory."
+                        function_result = {"result": f"Added {qty}x {item} to inventory."}
                     else:
-                        res = "Error: Player not found."
-
-                    print(f"[TOOL] {res}")
-                    response = await asyncio.to_thread(
-                        client.models.generate_content,
-                        model=MODEL_ID,
-                        contents=[
-                            types.Content(role="user", parts=[types.Part(text=prompt)]),
-                            response.candidates[0].content,
-                            types.Content(role="user", parts=[types.Part(function_response=types.FunctionResponse(name=call.name, response={'result': res}))])
-                        ],
-                        config=generate_config
-                    )
+                        function_result = {"result": "Error: Player not found."}
 
                 elif call.name == "update_relationship":
-                    args = call.args
-                    npc = args.get("npc_name")
-                    change = args.get("change")
-                    reason = args.get("reason")
+                    rl_args = call.args
+                    npc = rl_args.get("npc_name")
+                    change = rl_args.get("change")
+                    reason = rl_args.get("reason")
                     
                     if uid in players:
                         if "relationships" not in players[uid]: players[uid]["relationships"] = {}
-                        current = players[uid]["relationships"].get(npc, 0) # Default 0 (Neutral)
+                        current = players[uid]["relationships"].get(npc, 0)
                         new_score = max(0, min(100, current + change))
                         players[uid]["relationships"][npc] = new_score
                         save_state()
-                        res = f"{npc} Relationship: {current} -> {new_score} ({reason})"
+                        function_result = {"result": f"{npc} Relationship: {current} -> {new_score} ({reason})"}
                     else:
-                        res = "Error: Player not found."
+                        function_result = {"result": "Error: Player not found."}
 
-                    print(f"[TOOL] {res}")
-                    response = await asyncio.to_thread(
-                        client.models.generate_content,
-                        model=MODEL_ID,
-                        contents=[
-                            types.Content(role="user", parts=[types.Part(text=prompt)]),
-                            response.candidates[0].content,
-                            types.Content(role="user", parts=[types.Part(function_response=types.FunctionResponse(name=call.name, response={'result': res}))])
-                        ],
-                        config=generate_config
-                    )
-
-                # --- ECONOMY & PROGRESSION TOOLS ---
                 elif call.name == "update_inventory_gold":
-                    args = call.args
-                    added = args.get("items_added", [])
-                    removed = args.get("items_removed", [])
-                    gold_delta = args.get("gold_change", 0)
-                    reason = args.get("reason", "Trade")
+                    ec_args = call.args
+                    added = ec_args.get("items_added", [])
+                    removed = ec_args.get("items_removed", [])
+                    gold_delta = ec_args.get("gold_change", 0)
                     
                     if uid in players:
-                        # Init keys if missing (Migration)
                         if "inventory" not in players[uid]: players[uid]["inventory"] = []
                         if "gold" not in players[uid]: players[uid]["gold"] = 10 
                         
-                        # Gold
                         players[uid]["gold"] += gold_delta
-                        
-                        # Inventory
-                        for item in added:
-                            players[uid]["inventory"].append(item)
-                        
+                        for item in added: players[uid]["inventory"].append(item)
                         for item in removed:
-                            # Fuzzy remove (remove first match)
                             for inv_item in players[uid]["inventory"]:
                                 if item.lower() in inv_item.lower():
                                     players[uid]["inventory"].remove(inv_item)
                                     break
-                        
                         save_state()
-                        res = f"Gold: {players[uid]['gold']} ({gold_delta}). Items: +{added} -{removed}."
+                        function_result = {"result": f"Gold: {players[uid]['gold']} ({gold_delta}). Items: +{added} -{removed}."}
                     else:
-                        res = "Error: Player not found."
-                        
-                    print(f"[TOOL] {res}")
-                    response = await asyncio.to_thread(
-                        client.models.generate_content,
-                        model=MODEL_ID,
-                        contents=[
-                            types.Content(role="user", parts=[types.Part(text=prompt)]),
-                            response.candidates[0].content,
-                            types.Content(role="user", parts=[types.Part(function_response=types.FunctionResponse(name=call.name, response={'result': res}))])
-                        ],
-                        config=generate_config
-                    )
+                        function_result = {"result": "Error: Player not found."}
 
                 elif call.name == "grant_xp":
-                    args = call.args
-                    amt = args.get("amount", 0)
-                    reason = args.get("reason", "Adventure")
+                    xp_args = call.args
+                    amt = xp_args.get("amount", 0)
+                    reason = xp_args.get("reason", "Adventure")
                     
                     if uid in players:
-                        # Init keys if missing
                         if "xp" not in players[uid]: players[uid]["xp"] = 0
                         if "level" not in players[uid]: players[uid]["level"] = 1
                         
                         players[uid]["xp"] += amt
                         current_xp = players[uid]["xp"]
                         current_lvl = players[uid]["level"]
-                        
-                        # Simple Leveling: Level * 1000 XP
                         next_lvl_xp = current_lvl * 1000
                         
                         levelup_msg = ""
                         if current_xp >= next_lvl_xp:
                             players[uid]["level"] += 1
-                            players[uid]["hp_max"] += random.randint(4, 10) # Auto HP boost
+                            players[uid]["hp_max"] += random.randint(4, 10)
                             players[uid]["hp_current"] = players[uid]["hp_max"]
                             levelup_msg = f"🎉 LEVEL UP! You are now Level {players[uid]['level']}! HP Increased."
                         
                         save_state()
-                        res = f"XP: {current_xp} (+{amt}) [{reason}]. {levelup_msg}"
+                        function_result = {"result": f"XP: {current_xp} (+{amt}) [{reason}]. {levelup_msg}"}
                     else:
-                        res = "Error: Player not found."
-                        
-                    print(f"[TOOL] {res}")
-                    response = await asyncio.to_thread(
-                        client.models.generate_content,
-                        model=MODEL_ID,
-                        contents=[
-                            types.Content(role="user", parts=[types.Part(text=prompt)]),
-                            response.candidates[0].content,
-                            types.Content(role="user", parts=[types.Part(function_response=types.FunctionResponse(name=call.name, response={'result': res}))])
-                        ],
-                        config=generate_config
-                    )
+                        function_result = {"result": "Error: Player not found."}
 
                 elif call.name == "take_long_rest":
-                    # Execute Logic
                     if uid in players:
                         players[uid]['hp_current'] = players[uid]['hp_max']
                         save_state()
-                        
-                    res = {
+                    function_result = {
                         "event": "REST_COMPLETED",
                         "instruction": "The party rests. HP is restored. Describe a cozy campfire scene and ask the player a deep question."
                     }
-                    
-                    print(f"[{call.name}] {res}")
-                    response = await asyncio.to_thread(
-                        client.models.generate_content,
-                        model=MODEL_ID,
-                        contents=[
-                            types.Content(role="user", parts=[types.Part(text=prompt)]),
-                            response.candidates[0].content,
-                            types.Content(role="user", parts=[
-                                types.Part(function_response=types.FunctionResponse(name=call.name, response=res))
-                            ])
-                        ],
-                        config=generate_config
+
+                print(f"[TOOL_EXEC] {call.name} -> {function_result}")
+                
+                tool_response_parts.append(
+                    types.Part(
+                        function_response=types.FunctionResponse(
+                            name=call.name, 
+                            response=function_result
+                        )
                     )
+                )
+
+            # Send ALL tool results back
+            response = await asyncio.to_thread(
+                client.models.generate_content,
+                model=MODEL_ID,
+                contents=[
+                    types.Content(role="user", parts=[types.Part(text=prompt)]),
+                    response.candidates[0].content,
+                    types.Content(role="user", parts=tool_response_parts)
+                ],
+                config=generate_config
+            )
 
         text_response = response.text
         
@@ -829,14 +736,14 @@ async def relationships(ctx):
 @bot.command()
 async def recap(ctx):
     """Ask AI for story summary."""
-    # Pass '0' or 'System' as default UID since recap usually doesn't change state
-    res = await get_ai_response("Recap please.", "System", "0")
+    # Pass real ID so AI knows WHO is asking
+    res = await get_ai_response("Recap please.", "System", str(ctx.author.id))
     await ctx.send(f"📅 **Story So Far:**\n{res}")
 
 @bot.command()
 async def guide(ctx):
     """Ask the DM for a hint."""
-    res = await get_ai_response("I'm stuck, what should I do?", "System", "0")
+    res = await get_ai_response("I'm stuck, what should I do?", "System", str(ctx.author.id))
     await ctx.send(f"💡 **DM's Guide:**\n{res}")
 
 @bot.command()
