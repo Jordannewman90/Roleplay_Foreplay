@@ -742,9 +742,13 @@ async def narrate(ctx):
     last_dm_msg = None
     if chat_history:
         for msg in reversed(chat_history):
-            if msg.startswith("DM: "):
+            if msg.startswith("DM: ") and len(msg) > 10: # Ensure it's substantial
                 last_dm_msg = msg.replace("DM: ", "")
                 break
+    
+    # DEBUG: Print if not found
+    if not last_dm_msg and chat_history:
+        print(f"[DEBUG] !narrate failed. Last 3 history: {chat_history[-3:]}")
     
     if not last_dm_msg:
         await ctx.send("📭 **No recent story to narrate.**")
@@ -1186,6 +1190,10 @@ async def logs(ctx):
 async def on_command_error(ctx, error):
     """Global error handler for bot commands."""
     if isinstance(error, commands.MissingRequiredArgument):
+        if ctx.command and ctx.command.name == "speak":
+            # If user types !speak with no text, assume they meant !narrate
+            await ctx.invoke(bot.get_command('narrate'))
+            return
         await ctx.send(f"⚠️ **Missing Argument:** `{error.param.name}` is required.")
     elif isinstance(error, commands.CommandNotFound):
         pass 
