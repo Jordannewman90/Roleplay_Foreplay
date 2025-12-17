@@ -13,23 +13,15 @@ It combines legitimate tabletop RPG mechanics (stats, dice rolling, combat) with
 *   **Deep Memory:** Remembers the last **200 turns** of conversation, ensuring long-term storytelling continuity.
 *   **Context Aware:** Knows your HP, inventory, and current location at all times.
 
-### 🎮 Game Mechanics
-*   **Character Creation:** Guided process to roll stats (4d6 drop lowest), pick a Race, and choose a Class.
-*   **Combat System:**
-    *   Initiative tracking (You vs. Monster).
-    *   HP tracking (persists between sessions).
-    *   **Monster Manual:** Simple JSON-based monster definitions (`rules.json`).
-*   **Auto-Rolling:** Don't have dice? The DM will roll for you (e.g., "I rolled a 18 for your Persuasion check... nice.").
+### � True RNG Dice Engine
+*   **No Hallucinations:** The AI uses a Python-based deterministic dice engine (`dice_engine.py`) for all rolls. It cannot "fake" or "guess" numbers.
+*   **Function Calling:** The AI instinctively knows when to roll. If you say "I attack," it calls the dice engine tool, gets a real result (e.g., `1d20+5 = 18`), and narrates the outcome based on that math.
+*   **Manual Rolls:** Use `!roll 2d20` to roll dice yourself if you trust your own luck.
 
-### ☁️ Cloud Persistence
-*   **Auto-Save:** Every message and action saves the game state to `campaign_state.json`.
-*   **Railway Support:** Configured for persistent storage on Railway (using `/data` volume).
-*   **Google Drive Backups:** Automatically backs up your campaign to Google Drive once a week (or manually via `!backup`).
-
-### 🛡️ Robust Architecture
-*   **Google GenAI SDK:** Built on the latest `google-genai` Python SDK for stability.
-*   **Error Handling:** Friendly error messages instead of silent crashes.
-*   **Docker Ready:** Includes `Procfile` for easy cloud deployment.
+### ⚔️ Expanded D&D 5e Rules
+*   **Full Roster:** Now supports all 12 Classes (including **Bard**, Paladin, Warlock) and 9 Races (including **Tiefling**, Dragonborn, Half-Orc).
+*   **Combat System:** Tracks Initiative and HP.
+*   **Auto-Save:** Every action saves to the cloud (`/data` volume on Railway) and backs up weekly to Google Drive.
 
 ---
 
@@ -38,12 +30,14 @@ It combines legitimate tabletop RPG mechanics (stats, dice rolling, combat) with
 | Command | Description |
 | :--- | :--- |
 | `!start [premise]` | **Start a new campaign.** Optionally provide a premise (e.g. "Space pirates"), or let the AI invent one. |
-| `!create` | **Create a character.** The bot walks you through rolling stats and picking a class. |
+| `!create` | **Create a character.** The bot walks you through rolling stats (4d6 drop lowest), picking a Race, and Class. |
 | `!sheet` | **View Character Sheet.** Shows Name, Race, Class, HP, and Stats. |
+| `!roll [expr]` | **Manual Dice Roll.** e.g., `!roll 1d20+5` or `!roll 4d6`. Uses true RNG. |
 | `!fight [monster]` | **Start Combat.** Example: `!fight Goblin`. Rolls initiatives and sets the scene. |
 | `!rest` | **Long Rest.** Fully restores HP and saves the game. |
 | `!backup` | **Cloud Save.** Manually uploads `campaign_state.json` to Google Drive immediately. |
 | `!catchup` | **Recap.** Prints the last 4 story turns in case you forgot where you left off. |
+| `!snapshot` | **Scene Painting.** Generates a vivid text description of the current scene. |
 | `!status` | **Debug Info.** Shows bot uptime and the DM's internal "thought process" (fun for peeking behind the curtain). |
 | `!fix` | **Mind Wipe.** Clears the AI's short-term memory (useful if it gets stuck in a loop), but keeps character stats. |
 
@@ -51,7 +45,7 @@ It combines legitimate tabletop RPG mechanics (stats, dice rolling, combat) with
 
 ## 🚀 The Roadmap / Future Fun Stuff
 *   **Relationship Tracking:** NPCs that have "Affection Points" and distinct relationship tiers (Strangers -> Lovers).
-*   **Image Generation 2.0:** Re-enabling the `!snapshot` command with a better model to generate scene art on the fly.
+*   **Image Generation 2.0:** Re-enabling actual image generation (Stable Diffusion or Imagen) for the `!snapshot` command.
 *   **Voice Mode:** investigating ways to add TTS (Text-to-Speech) so the DM can *speak* the sultry narrations.
 *   **Quest Log:** A persistent list of active quests and objectives managed by the AI.
 
