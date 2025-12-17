@@ -2,7 +2,7 @@
 
 **roleplay_foreplay** is your "Dungeon Master with Benefits"—a bespoke AI-powered Discord bot designed for private, couple-focused D&D 5e campaigns.
 
-It combines legitimate tabletop RPG mechanics (stats, dice rolling, combat) with an immersive, spicy, and romance-novel-worthy narrative driven by Google's Gemini 1.5 Pro.
+It combines legitimate tabletop RPG mechanics (stats, dice rolling, combat) with an immersive, spicy, and romance-novel-worthy narrative driven by Google's **Gemini 2.5 Pro**.
 
 ---
 

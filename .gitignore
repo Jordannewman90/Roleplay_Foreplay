@@ -3,3 +3,4 @@ venv/
 __pycache__/
 *.pyc
 campaign_state.json
+verify_gemini_pro.py
