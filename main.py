@@ -17,6 +17,7 @@ import dice_engine
 import character_creator
 import campaign_crafter
 import image_generator
+import speech_generator
 from utils import retry_with_backoff
 
 # --- CONFIGURATION ---
@@ -683,6 +684,52 @@ async def start(ctx, *, premise=None):
         # We pass the prompt as the user input to get the DM response
         response = await get_ai_response(prompt, "System", uid)
         await ctx.send(f"⚔️ **The Adventure Begins...**\n\n**Premise:** _{premise}_\n\n{response}")
+
+@bot.command()
+async def speak(ctx, *, text: str):
+    """Make the DM speak custom text. Usage: !speak [text]"""
+    if not text:
+        await ctx.send("⚠️ usage: `!speak [text]`")
+        return
+        
+    async with ctx.typing():
+        wav_bytes, error = await asyncio.to_thread(speech_generator.generate_speech, text)
+        
+        if wav_bytes:
+            import io
+            with io.BytesIO(wav_bytes) as audio_binary:
+                await ctx.send(file=discord.File(fp=audio_binary, filename='speech.wav'))
+        else:
+            await ctx.send(f"⚠️ Speech Error: {error}")
+
+@bot.command()
+async def narrate(ctx):
+    """Read the last DM message aloud."""
+    # Find last message starting with "DM: " in history
+    last_dm_msg = None
+    if chat_history:
+        for msg in reversed(chat_history):
+            if msg.startswith("DM: "):
+                last_dm_msg = msg.replace("DM: ", "")
+                break
+    
+    if not last_dm_msg:
+        await ctx.send("📭 **No recent story to narrate.**")
+        return
+        
+    await ctx.send(f"🎙️ **Narrating:** _{last_dm_msg[:50]}..._")
+    async with ctx.typing():
+        # Limit length to avoid timeouts/limits on long texts?
+        # Gemini TTS is usually generous, but let's cap at 500 chars for safety if needed.
+        # For now, let's try full text.
+        wav_bytes, error = await asyncio.to_thread(speech_generator.generate_speech, last_dm_msg)
+        
+        if wav_bytes:
+            import io
+            with io.BytesIO(wav_bytes) as audio_binary:
+                await ctx.send(file=discord.File(fp=audio_binary, filename='narration.wav'))
+        else:
+            await ctx.send(f"⚠️ Speech Error: {error}")
 
 @bot.command()
 async def create(ctx):
