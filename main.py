@@ -17,6 +17,7 @@ import dice_engine
 import dice_engine
 import character_creator
 import campaign_crafter
+import image_generator
 from utils import retry_with_backoff
 
 # --- CONFIGURATION ---
@@ -296,35 +297,14 @@ async def avatar(ctx, *, instruction: str = "Make me a fantasy character"):
 
             await ctx.send("🎨 **Analyzing & transforming...**")
 
-            # Create Prompt
-            prompt_text = (
-                f"Transform this person into a high-quality fantasy character portrait. {instruction}. "
-                "Keep the facial features recognizable but styled like a heroic oil painting or D&D concept art. "
-                "High detail, dramatic lighting."
-            )
-
-            # Generate Content with Image + Text
-            response = await asyncio.to_thread(
-                client.models.generate_content,
-                model='gemini-2.5-flash-image',
-                contents=[prompt_text, input_image]
-            )
-
-            # Extract Result
-            if response.parts:
-                for part in response.parts:
-                    if part.inline_data:
-                         # Use raw bytes directly
-                        image_bytes = part.inline_data.data
-                        mime_type = part.inline_data.mime_type or "image/png"
-                        ext = "jpg" if "jpeg" in mime_type else "png"
-                        
-                        import io
-                        with io.BytesIO(image_bytes) as output_binary:
-                            await ctx.send(f"✨ **Avatar Generated:** '{instruction}'", file=discord.File(fp=output_binary, filename=f'avatar.{ext}'))
-                        return
-
-            await ctx.send("⚠️ The arcane energies failed to weave an image form.")
+            # 2. Run Generation
+            img_bytes, ext = await asyncio.to_thread(image_generator.generate_avatar, instruction, input_image_bytes, input_mime_type)
+            
+            if img_bytes:
+                 with io.BytesIO(img_bytes) as output_binary:
+                    await ctx.send(f"✨ **Avatar Generated:** '{instruction}'", file=discord.File(fp=output_binary, filename=f'avatar.{ext}'))
+            else:
+                 await ctx.send(f"⚠️ Avatar Failed: {ext}")
 
         except Exception as e:
             await ctx.send(f"⚠️ Avatar Error: {e}")
