@@ -1,21 +1,170 @@
 {
   "races": {
-    "human": { "name": "Human", "speed": 30, "description": "Versatile and ambitious." },
-    "hill_dwarf": { "name": "Hill Dwarf", "speed": 25, "description": "Tough and wise." },
-    "high_elf": { "name": "High Elf", "speed": 30, "description": "Magical and agile." },
-    "lightfoot_halfling": { "name": "Lightfoot Halfling", "speed": 25, "description": "Stealthy and lucky." }
+    "human": {
+      "name": "Human",
+      "speed": 30,
+      "description": "Versatile and ambitious."
+    },
+    "high_elf": {
+      "name": "High Elf",
+      "speed": 30,
+      "description": "Magical and agile, with keen senses."
+    },
+    "wood_elf": {
+      "name": "Wood Elf",
+      "speed": 35,
+      "description": "Swift and intuitive forest dweller."
+    },
+    "hill_dwarf": {
+      "name": "Hill Dwarf",
+      "speed": 25,
+      "description": "Tough and wise."
+    },
+    "mountain_dwarf": {
+      "name": "Mountain Dwarf",
+      "speed": 25,
+      "description": "Strong and resilient."
+    },
+    "lightfoot_halfling": {
+      "name": "Lightfoot Halfling",
+      "speed": 25,
+      "description": "Stealthy and lucky."
+    },
+    "stout_halfling": {
+      "name": "Stout Halfling",
+      "speed": 25,
+      "description": "Resilient and brave."
+    },
+    "tiefling": {
+      "name": "Tiefling",
+      "speed": 30,
+      "description": "Infernal heritage, charismatic and mysterious."
+    },
+    "dragonborn": {
+      "name": "Dragonborn",
+      "speed": 30,
+      "description": "Proud draconic ancestry with breath weapon."
+    },
+    "gnome": {
+      "name": "Gnome",
+      "speed": 25,
+      "description": "Inventive and energetic."
+    },
+    "half_orc": {
+      "name": "Half-Orc",
+      "speed": 30,
+      "description": "Fierce and enduring warrior."
+    },
+    "half_elf": {
+      "name": "Half-Elf",
+      "speed": 30,
+      "description": "Charismatic diplomat, adaptable."
+    }
   },
   "classes": {
-    "fighter": { "name": "Fighter", "hit_die": 10, "equipment": "Chain Mail & Longsword" },
-    "cleric": { "name": "Cleric", "hit_die": 8, "equipment": "Mace & Scale Mail" },
-    "rogue": { "name": "Rogue", "hit_die": 8, "equipment": "Leather Armor & Daggers" },
-    "wizard": { "name": "Wizard", "hit_die": 6, "equipment": "Quarterstaff & Spellbook" }
+    "fighter": {
+      "name": "Fighter",
+      "hit_die": 10,
+      "equipment": "Chain Mail & Longsword"
+    },
+    "barbarian": {
+      "name": "Barbarian",
+      "hit_die": 12,
+      "equipment": "Greataxe & Handaxes"
+    },
+    "paladin": {
+      "name": "Paladin",
+      "hit_die": 10,
+      "equipment": "Chain Mail, Shield & Warhammer"
+    },
+    "ranger": {
+      "name": "Ranger",
+      "hit_die": 10,
+      "equipment": "Scale Mail, Longbow & Shortswords"
+    },
+    "cleric": {
+      "name": "Cleric",
+      "hit_die": 8,
+      "equipment": "Mace, Scale Mail & Shield"
+    },
+    "druid": {
+      "name": "Druid",
+      "hit_die": 8,
+      "equipment": "Leather Armor, Shield & Scimitar"
+    },
+    "rogue": {
+      "name": "Rogue",
+      "hit_die": 8,
+      "equipment": "Leather Armor & Daggers"
+    },
+    "monk": {
+      "name": "Monk",
+      "hit_die": 8,
+      "equipment": "Shortsword & Darts"
+    },
+    "bard": {
+      "name": "Bard",
+      "hit_die": 8,
+      "equipment": "Leather Armor, Rapier & Musical Instrument"
+    },
+    "warlock": {
+      "name": "Warlock",
+      "hit_die": 8,
+      "equipment": "Leather Armor, Daggers & Arcane Focus"
+    },
+    "sorcerer": {
+      "name": "Sorcerer",
+      "hit_die": 6,
+      "equipment": "Daggers & Component Pouch"
+    },
+    "wizard": {
+      "name": "Wizard",
+      "hit_die": 6,
+      "equipment": "Quarterstaff & Spellbook"
+    }
   },
   "monsters": {
-    "goblin": { "name": "Goblin", "hp": 7, "ac": 15, "init_bonus": 2 },
-    "skeleton": { "name": "Skeleton", "hp": 13, "ac": 13, "init_bonus": 2 },
-    "bandit": { "name": "Bandit", "hp": 11, "ac": 12, "init_bonus": 1 },
-    "giant_rat": { "name": "Giant Rat", "hp": 7, "ac": 12, "init_bonus": 2 },
-    "orc": { "name": "Orc", "hp": 15, "ac": 13, "init_bonus": 1 }
+    "goblin": {
+      "name": "Goblin",
+      "hp": 7,
+      "ac": 15,
+      "init_bonus": 2
+    },
+    "skeleton": {
+      "name": "Skeleton",
+      "hp": 13,
+      "ac": 13,
+      "init_bonus": 2
+    },
+    "bandit": {
+      "name": "Bandit",
+      "hp": 11,
+      "ac": 12,
+      "init_bonus": 1
+    },
+    "giant_rat": {
+      "name": "Giant Rat",
+      "hp": 7,
+      "ac": 12,
+      "init_bonus": 2
+    },
+    "orc": {
+      "name": "Orc",
+      "hp": 15,
+      "ac": 13,
+      "init_bonus": 1
+    },
+    "bugbear": {
+      "name": "Bugbear",
+      "hp": 27,
+      "ac": 16,
+      "init_bonus": 2
+    },
+    "succubus": {
+      "name": "Succubus",
+      "hp": 66,
+      "ac": 15,
+      "init_bonus": 3
+    }
   }
 }
