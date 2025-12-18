@@ -6,8 +6,12 @@ from google.genai import types
 from dotenv import load_dotenv
 
 load_dotenv()
-client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
+# Initialize Client
+# LAZY LOADING: Moved inside functions to prevent startup crashes.
 SPEECH_MODEL_ID = 'gemini-2.5-flash-preview-tts'
+
+def get_client():
+    return genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 
 def generate_speech(text, voice_name='Kore'):
     """
@@ -21,6 +25,7 @@ def generate_speech(text, voice_name='Kore'):
     safe_text = text[:3000] 
 
     try:
+        client = get_client()
         response = client.models.generate_content(
             model=SPEECH_MODEL_ID,
             contents=[types.Part(text=safe_text)], # Wrapped for SDK consistency

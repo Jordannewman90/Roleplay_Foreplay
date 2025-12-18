@@ -7,8 +7,11 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Initialize Client
-client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
+# LAZY LOADING: Moved inside functions to prevent startup crashes if key is missing.
 IMAGE_MODEL_ID = 'gemini-2.5-flash-image'
+
+def get_client():
+    return genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 
 def generate_scene_image(prompt):
     """
@@ -16,6 +19,7 @@ def generate_scene_image(prompt):
     Returns: (image_bytes, file_extension_str) or (None, error_message)
     """
     try:
+        client = get_client()
         response = client.models.generate_content(
             model=IMAGE_MODEL_ID,
             contents=prompt,
@@ -40,6 +44,7 @@ def generate_avatar(instruction, input_image_bytes=None, input_mime_type=None):
     Returns: (image_bytes, file_extension_str) or (None, error_message)
     """
     try:
+        client = get_client()
         contents = [types.Part(text=instruction)]
         
         if input_image_bytes and input_mime_type:
