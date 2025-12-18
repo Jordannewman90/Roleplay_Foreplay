@@ -638,11 +638,14 @@ async def get_ai_response(user_input, user_name, uid):
                 )
 
             # Send ALL tool results back
+            # Fix: Ensure we send the correct prompt context back
+            input_text_for_tool = dynamic_prompt if cache_name else full_prompt
+            
             response = await asyncio.to_thread(
                 get_client().models.generate_content,
                 model=MODEL_ID,
                 contents=[
-                    types.Content(role="user", parts=[types.Part(text=prompt)]),
+                    types.Content(role="user", parts=[types.Part(text=input_text_for_tool)]),
                     response.candidates[0].content,
                     types.Content(role="user", parts=tool_response_parts)
                 ],
@@ -963,7 +966,7 @@ async def run_campaign_step(message):
 
             text = response.text
             sess['history'].append(f"Architect: {text}")
-            await message.channel.send(text)
+            await send_chunked_message(message.channel, text)
             
         except Exception as e:
             print(f"[ERROR] Campaign Loop: {e}")
@@ -1221,14 +1224,5 @@ async def on_command_error(ctx, error):
 
 # ... (rest of file)
 
-# Helper for decorated call
-@retry_with_backoff(retries=3, initial_delay=4, factor=2)
-async def retry_generate_content(prompt, config):
-    return await asyncio.to_thread(
-        client.models.generate_content,
-        model=MODEL_ID,
-        contents=prompt,
-        config=config
-    )
 
 bot.run(os.getenv("DISCORD_TOKEN"))
