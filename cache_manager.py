@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 load_dotenv()
 # client = genai.Client(api_key=os.getenv("GEMINI_API_KEY")) # REMOVED global init
 
-MODEL_ID = 'gemini-2.5-pro'
+MODEL_ID = 'gemini-2.0-flash-exp'
 
 # Singleton Client
 _client_instance = None

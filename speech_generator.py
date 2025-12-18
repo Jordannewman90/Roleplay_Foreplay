@@ -8,7 +8,7 @@ from dotenv import load_dotenv
 load_dotenv()
 # Initialize Client
 # LAZY LOADING: Moved inside functions to prevent startup crashes.
-SPEECH_MODEL_ID = 'gemini-2.5-flash-preview-tts'
+SPEECH_MODEL_ID = 'gemini-2.0-flash-exp'
 
 # Singleton Client
 _client_instance = None

@@ -15,6 +15,10 @@ It combines legitimate tabletop RPG mechanics (stats, dice rolling, combat) with
     *   "Bot narrate" or "Narratem" -> Triggers `!narrate` to read the last message aloud. 
 *   **"The Legend":** Type `!legend` to hear a bardic retelling of your entire campaign so far.
 
+### 🎨 Autonomous Visuals (New!)
+*   **Self-Aware Vision:** The DM isn't just text anymore. If a moment is truly epic, the AI can *decide* to paint a picture of the scene using **Imagen 3**, without you asking.
+*   **Gemini 2.0 Flash:** Powered by Google's fastest model for near-instant responses.
+
 ### 💰 Economy & Progression (Lite)
 *   **Gold Logic:** The AI tracks your purse. Buy ales, bribe guards, or purchase magic items naturally in chat.
 *   **XP & Leveling:** The DM awards XP for heroic deeds. Level up to gain HP and status.
@@ -65,7 +69,7 @@ It combines legitimate tabletop RPG mechanics (stats, dice rolling, combat) with
 | `!rest` | **Long Rest.** Fully restores HP and starts a campground roleplay scene. |
 | `!backup` | **Cloud Save.** Manually uploads `campaign_state.json` to Google Drive immediately. |
 | `!catchup` | **Recap.** Prints the last 4 story turns in case you forgot where you left off. |
-| `!snapshot` | **Scene Painting.** Generates a vivid **Image** of the current scene (Using Gemini 2.5 Flash). |
+| `!snapshot` | **Scene Painting.** Generates a vivid **Image** of the current scene (Using **Imagen 3**). |
 | `!avatar [style]` | **Selfie to Fantasy.** Attach a photo (or use saved face) to transform into a character. |
 | `!save_face` | **Upload Selfie.** Attach a photo to save it as your default for `!avatar`. |
 | `!logs` | **Debug Logs.** (Admin) View the last 20 internal errors or logs. |
