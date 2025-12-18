@@ -25,6 +25,24 @@ def get_active_cache(display_name):
 
 def create_cache(content_text, tools_list, display_name):
     try:
+        # PADDING LOGIC
+        # Caching requires min 2048 tokens. If we are under, we pad.
+        # Check count first
+        try:
+             count_resp = client.models.count_tokens(model=MODEL_ID, contents=content_text)
+             token_count = count_resp.total_tokens
+             print(f"[CACHE] System Prompt Tokens: {token_count}")
+             
+             if token_count < 2100:
+                 # Calculate deficit
+                 needed = 2200 - token_count # Aim for 2200 to be safe
+                 print(f"[CACHE] Padding with ~{needed} tokens to meet requirements...")
+                 # 1 token is roughly 4 chars, but " a " is 1 token.
+                 padding = " a " * needed 
+                 content_text += f"\n\n<system_padding_ignore_this>\n{padding}\n</system_padding_ignore_this>"
+        except Exception as e:
+            print(f"[CACHE] Padding Check Failed (skipping padding): {e}")
+
         # We include tools in the cache creation for better performance
         cache = client.caches.create(
             model=MODEL_ID,

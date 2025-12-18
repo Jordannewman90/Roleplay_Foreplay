@@ -20,7 +20,8 @@ import image_generator
 import speech_generator
 import cache_manager
 import ai_persona # explicit import for access
-from utils import retry_with_backoff
+import ai_persona # explicit import for access
+from utils import retry_with_backoff, send_chunked_message
 
 # --- CONFIGURATION ---
 load_dotenv()
@@ -251,12 +252,12 @@ if not os.path.exists(IMAGES_DIR):
 async def save_face(ctx):
     """Save your appearance. Attach a photo! Usage: !save_face"""
     if not ctx.message.attachments:
-        await ctx.send("⚠️ **Missing Photo:** Please attach an image to save your look!")
+        await send_chunked_message(ctx, "⚠️ **Missing Photo:** Please attach an image to save your look!")
         return
         
     attachment = ctx.message.attachments[0]
     if not attachment.content_type.startswith('image/'):
-        await ctx.send("⚠️ That doesn't look like an image.")
+        await send_chunked_message(ctx, "⚠️ That doesn't look like an image.")
         return
 
     uid = str(ctx.author.id)
@@ -264,9 +265,9 @@ async def save_face(ctx):
     
     try:
         await attachment.save(file_path)
-        await ctx.send("💾 **Face Saved!** I'll use this for future avatars if you don't attach a new one.")
+        await send_chunked_message(ctx, "💾 **Face Saved!** I'll use this for future avatars if you don't attach a new one.")
     except Exception as e:
-        await ctx.send(f"⚠️ Error saving face: {e}")
+        await send_chunked_message(ctx, f"⚠️ Error saving face: {e}")
 
 @bot.command()
 async def avatar(ctx, *, instruction: str = "Make me a fantasy character"):
@@ -291,13 +292,13 @@ async def avatar(ctx, *, instruction: str = "Make me a fantasy character"):
                 with open(os.path.join(IMAGES_DIR, f"{uid}.png"), "rb") as f:
                     input_image_bytes = f.read()
                 input_mime_type = "image/png"
-                await ctx.send("📂 **Using saved face reference...**")
+                await send_chunked_message(ctx, "📂 **Using saved face reference...**")
             
             if not input_image_bytes:
-                 await ctx.send("⚠️ **No Face Found!** Attach a photo or use `!save_face` first.")
+                 await send_chunked_message(ctx, "⚠️ **No Face Found!** Attach a photo or use `!save_face` first.")
                  return
 
-            await ctx.send("🎨 **Analyzing & transforming...**")
+            await send_chunked_message(ctx, "🎨 **Analyzing & transforming...**")
 
             # 3. Run Generation
             img_bytes, ext = await asyncio.to_thread(image_generator.generate_avatar, instruction, input_image_bytes, input_mime_type)
@@ -306,10 +307,10 @@ async def avatar(ctx, *, instruction: str = "Make me a fantasy character"):
                  with io.BytesIO(img_bytes) as output_binary:
                     await ctx.send(f"✨ **Avatar Generated:** '{instruction}'", file=discord.File(fp=output_binary, filename=f'avatar.{ext}'))
             else:
-                 await ctx.send(f"⚠️ Avatar Failed: {ext}")
+                 await send_chunked_message(ctx, f"⚠️ Avatar Failed: {ext}")
 
         except Exception as e:
-            await ctx.send(f"⚠️ Avatar Error: {e}")
+            await send_chunked_message(ctx, f"⚠️ Avatar Error: {e}")
 creation_sessions = {}
 campaign_sessions = {}
 players = {}
@@ -658,14 +659,14 @@ async def fight(ctx, monster_name: str=""):
     """Start Combat (Cinematic). Usage: !fight [monster]"""
     # If no argument, maybe asking for list?
     if not monster_name:
-        await ctx.send(f"⚠️ Usage: `!fight [Monster]`. Available: {', '.join(RULES['monsters'].keys())}")
+        await send_chunked_message(ctx, f"⚠️ Usage: `!fight [Monster]`. Available: {', '.join(RULES['monsters'].keys())}")
         return
 
     async with ctx.typing():
         # Invoke AI to handle the fight logic
         uid = str(ctx.author.id)
         response = await get_ai_response(f"(Command: Start Combat with {monster_name})", ctx.author.display_name, uid)
-        await ctx.send(response)
+        await send_chunked_message(ctx, response)
         save_state()
 
 @bot.command()
@@ -674,7 +675,7 @@ async def rest(ctx):
     async with ctx.typing():
         uid = str(ctx.author.id)
         response = await get_ai_response(f"(Command: Take Long Rest)", ctx.author.display_name, uid)
-        await ctx.send(response)
+        await send_chunked_message(ctx, response)
         save_state()
 
 
@@ -716,13 +717,13 @@ async def start(ctx, *, premise=None):
         uid = str(ctx.author.id)
         # We pass the prompt as the user input to get the DM response
         response = await get_ai_response(prompt, "System", uid)
-        await ctx.send(f"⚔️ **The Adventure Begins...**\n\n**Premise:** _{premise}_\n\n{response}")
+        await send_chunked_message(ctx, f"⚔️ **The Adventure Begins...**\n\n**Premise:** _{final_premise}_\n\n{response}")
 
 @bot.command()
 async def speak(ctx, *, text: str):
     """Make the DM speak custom text. Usage: !speak [text]"""
     if not text:
-        await ctx.send("⚠️ usage: `!speak [text]`")
+        await send_chunked_message(ctx, "⚠️ usage: `!speak [text]`")
         return
         
     async with ctx.typing():
@@ -751,10 +752,10 @@ async def narrate(ctx):
         print(f"[DEBUG] !narrate failed. Last 3 history: {chat_history[-3:]}")
     
     if not last_dm_msg:
-        await ctx.send("📭 **No recent story to narrate.**")
+        await send_chunked_message(ctx, "📭 **No recent story to narrate.**")
         return
         
-    await ctx.send(f"🎙️ **Narrating:** _{last_dm_msg[:50]}..._")
+    await send_chunked_message(ctx, f"🎙️ **Narrating:** _{last_dm_msg[:50]}..._")
     async with ctx.typing():
         # Limit length to avoid timeouts/limits on long texts?
         # Gemini TTS is usually generous, but let's cap at 500 chars for safety if needed.
@@ -773,7 +774,7 @@ async def create(ctx):
     """Start Character Creation (Conversational Mode)."""
     uid = str(ctx.author.id)
     if uid in players:
-        await ctx.send("You already have a character! Type `!sheet`.")
+        await send_chunked_message(ctx, "You already have a character! Type `!sheet`.")
         return
     
     # 1. Roll Stats in Background
@@ -786,7 +787,7 @@ async def create(ctx):
         'history': [] # Chat history for the consultant
     }
     
-    await ctx.send(f"🎲 **Stats Rolled:** {stats}\n"
+    await send_chunked_message(ctx, f"🎲 **Stats Rolled:** {stats}\n"
                    f"✨ **Summoning Character Consultant...**\n"
                    f"_(A stylish projection appears)_ 'Darling, you look essentially formless. Let's fix that. What kind of fantasy are we building today?'")
 

@@ -32,3 +32,22 @@ def retry_with_backoff(retries=3, initial_delay=2, factor=2):
             return None # Should not be reached
         return wrapper
     return decorator
+
+async def send_chunked_message(ctx, text):
+    """
+    Splits long text into chunks of 1900 chars (safe under 2000 limit) 
+    and sends them sequentially to the discord context.
+    """
+    if not text:
+        return
+
+    # specific Discord limit is 2000, using 1900 for safety buffer
+    chunk_size = 1900
+    
+    if len(text) <= chunk_size:
+        await ctx.send(text)
+    else:
+        # Split text into chunks
+        chunks = [text[i:i+chunk_size] for i in range(0, len(text), chunk_size)]
+        for chunk in chunks:
+            await ctx.send(chunk)

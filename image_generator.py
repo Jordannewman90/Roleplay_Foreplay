@@ -20,7 +20,7 @@ def generate_scene_image(prompt):
             model=IMAGE_MODEL_ID,
             contents=prompt,
             config=types.GenerateContentConfig(
-                response_mime_type="image/jpeg"
+                temperature=0.7 
             )
         )
         
@@ -49,7 +49,7 @@ def generate_avatar(instruction, input_image_bytes=None, input_mime_type=None):
             model=IMAGE_MODEL_ID,
             contents=contents,
             config=types.GenerateContentConfig(
-                response_mime_type="image/jpeg"
+                temperature=0.7
             )
         )
 
