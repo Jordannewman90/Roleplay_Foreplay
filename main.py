@@ -508,7 +508,7 @@ async def run_creation_step(message):
         # We'll just echo the AI.
         
         session['history'].append(f"Consultant: {ai_reply}")
-        await message.channel.send(ai_reply)
+        await send_chunked_message(message.channel, ai_reply)
         
     except Exception as e:
         await message.channel.send(f"⚠️ Creation Error: {e}")
@@ -532,7 +532,7 @@ async def run_campaign_step(message):
         )
         ai_reply = response.text
         session['history'].append(f"Architect: {ai_reply}")
-        await message.channel.send(ai_reply)
+        await send_chunked_message(message.channel, ai_reply)
         
     except Exception as e:
         await message.channel.send(f"⚠️ Campaign Error: {e}")
