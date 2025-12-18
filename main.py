@@ -30,8 +30,14 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 
 # Gemini Setup
 # client = genai.Client(api_key=os.getenv("GEMINI_API_KEY")) # REMOVED global init
+# Singleton Client to prevent "Client has been closed" errors
+_client_instance = None
+
 def get_client():
-    return genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
+    global _client_instance
+    if _client_instance is None:
+        _client_instance = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
+    return _client_instance
 
 MODEL_ID = 'gemini-2.5-pro' # Specific 2.5 Version (User Requested)
 # Tool Definition

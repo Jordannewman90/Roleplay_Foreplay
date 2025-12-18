@@ -9,8 +9,14 @@ load_dotenv()
 
 MODEL_ID = 'gemini-2.5-pro'
 
+# Singleton Client
+_client_instance = None
+
 def get_client():
-    return genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
+    global _client_instance
+    if _client_instance is None:
+        _client_instance = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
+    return _client_instance
 
 def get_cache_version(text):
     """Creates a unique hash for the prompt text."""
