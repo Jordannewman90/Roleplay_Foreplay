@@ -57,8 +57,8 @@ def generate_avatar(instruction, input_image_bytes=None, input_mime_type=None):
     """
     try:
         client = get_client()
-        # Fallback to 2.5 flash logic for Img2Img since 3.0 generate-001 is text-to-image mostly
-        model_id = 'gemini-2.5-flash-image'
+        # Fallback to 3.0 flash logic for Img2Img since 3.0 generate-001 is text-to-image mostly
+        model_id = 'gemini-3-flash-preview'
         
         contents = [types.Part(text=instruction)]
         

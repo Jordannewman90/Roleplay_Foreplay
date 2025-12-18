@@ -17,7 +17,7 @@ It combines legitimate tabletop RPG mechanics (stats, dice rolling, combat) with
 
 ### 🎨 Autonomous Visuals (New!)
 *   **Self-Aware Vision:** The DM isn't just text anymore. If a moment is truly epic, the AI can *decide* to paint a picture of the scene using **Imagen 3**, without you asking.
-*   **Gemini 2.0 Flash:** Powered by Google's fastest model for near-instant responses.
+*   **Gemini 3 Flash:** Powered by Google's newest, fastest model (`gemini-3-flash-preview`) for near-instant responses.
 
 ### 💰 Economy & Progression (Lite)
 *   **Gold Logic:** The AI tracks your purse. Buy ales, bribe guards, or purchase magic items naturally in chat.
@@ -89,7 +89,7 @@ It combines legitimate tabletop RPG mechanics (stats, dice rolling, combat) with
 
 ## 🚀 The Roadmap / Future Fun Stuff
 ## 🚀 The Roadmap / Future Fun Stuff
-*   **Gemini 2.0 Flash Experience:** ✅ NOW LIVE! Running on the cutting-edge `gemini-2.0-flash-exp` for lightning-fast responses and vision capabilities.
+*   **Gemini 3.0 Flash Experience:** ✅ NOW LIVE! Running on the bleeding-edge `gemini-3.0-flash-exp`.
 *   **Autonomous Vision:** ✅ NOW LIVE! The DM can now *choose* to paint a scene (`!illustrate_scene`) without you asking, if the moment is dramatic enough.
 *   **Imagen 3.0:** ✅ NOW LIVE! Scenes are generated using Google's latest Imagen 3 model.
 

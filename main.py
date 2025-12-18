@@ -39,7 +39,7 @@ def get_client():
     return _client_instance
 
 # UPDATED: Using the latest Flash Experience for speed/vision
-MODEL_ID = 'gemini-2.0-flash-exp' 
+MODEL_ID = 'gemini-3-flash-preview' 
 
 # --- DATA STRUCTURES ---
 creation_sessions = {}
