@@ -51,8 +51,6 @@ It combines legitimate tabletop RPG mechanics (stats, dice rolling, combat) with
 
 | Command | Description |
 | :--- | :--- |
-| Command | Description |
-| :--- | :--- |
 | `!start` | **Start Campaign.** Begins the adventure using your generated World or a random one. |
 | `!world` | **World Architect.** Design your own setting, villains, and rules interactively before starting. |
 | `!narrate` | **Narrate Story.** Reads the last DM response aloud (Audio). |
@@ -79,6 +77,11 @@ It combines legitimate tabletop RPG mechanics (stats, dice rolling, combat) with
 ### ⚡ Performance & Caching
 *   **Context Caching:** To reduce costs and latency, the bot caches its massive rules, persona, and world bible (Static Context) using **Gemini Context Caching**.
 *   **Version Hashing:** Any changes to the persona automatically trigger a new cache version, ensuring your DM is always up to date.
+*   **Message Chunking:** Long stories are automatically split into 1900-character chunks to bypass Discord message limits.
+
+### 🏗️ Technical Architecture (Deployment Stability)
+*   **Singleton Pattern:** The bot uses a single, shared `genai.Client` instance across all modules (`main`, `image`, `speech`, `cache`). This prevents "Client has been closed" and "Resource Exhausted" errors during high load.
+*   **Lazy Loading:** API clients are initialized *only* when first needed, preventing the bot from crashing on startup if environment variables are momentarily unavailable.
 
 ## 🚀 The Roadmap / Future Fun Stuff
 *   **Image Generation 2.0:** ✅ NOW LIVE! `!snapshot` and `!avatar` use the new Gemini 2.5 Image model.
