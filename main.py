@@ -29,7 +29,10 @@ intents = discord.Intents.all()
 bot = commands.Bot(command_prefix="!", intents=intents)
 
 # Gemini Setup
-client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
+# client = genai.Client(api_key=os.getenv("GEMINI_API_KEY")) # REMOVED global init
+def get_client():
+    return genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
+
 MODEL_ID = 'gemini-2.5-pro' # Specific 2.5 Version (User Requested)
 # Tool Definition
 dice_tool = types.Tool(
@@ -420,6 +423,15 @@ async def weekly_backup_task():
 # --- AI NARRATOR ---
 # --- AI NARRATOR ---
 @retry_with_backoff(retries=3, initial_delay=4, factor=2)
+async def retry_generate_content(prompt, config):
+    return await asyncio.to_thread(
+        get_client().models.generate_content,
+        model=MODEL_ID,
+        contents=prompt,
+        config=config
+    )
+
+@retry_with_backoff(retries=3, initial_delay=4, factor=2)
 async def get_ai_response(user_input, user_name, uid):
     global last_thought, chat_history
     last_thought = f"Processing input from {user_name}..."
@@ -452,7 +464,7 @@ async def get_ai_response(user_input, user_name, uid):
         if cache_name:
             # Use Cached Content
             response = await asyncio.to_thread(
-                client.models.generate_content,
+                get_client().models.generate_content,
                 model=MODEL_ID,
                 contents=dynamic_prompt, # Only send the new stuff!
                 config=types.GenerateContentConfig(
@@ -467,7 +479,7 @@ async def get_ai_response(user_input, user_name, uid):
              # Fallback to Full Prompt (No Cache)
             full_prompt = ai_persona.get_dungeon_master_prompt(context_str, current_state_json)
             response = await asyncio.to_thread(
-                client.models.generate_content,
+                get_client().models.generate_content,
                 model=MODEL_ID,
                 contents=full_prompt,
                 config=generate_config
@@ -627,7 +639,7 @@ async def get_ai_response(user_input, user_name, uid):
 
             # Send ALL tool results back
             response = await asyncio.to_thread(
-                client.models.generate_content,
+                get_client().models.generate_content,
                 model=MODEL_ID,
                 contents=[
                     types.Content(role="user", parts=[types.Part(text=prompt)]),
@@ -698,7 +710,7 @@ async def start(ctx, *, premise=None):
             # Use Text-Only Config to prevent tool call hallucinations
             premise_prompt = "Generate a short, exciting, and slightly spicy D&D 5e campaign premise for a couple. Include a hook for adventure and intimacy."
             premise_resp = await asyncio.to_thread(
-                client.models.generate_content, 
+                get_client().models.generate_content, 
                 model=MODEL_ID, 
                 contents=premise_prompt, 
                 config=text_only_config

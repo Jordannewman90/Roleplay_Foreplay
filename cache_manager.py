@@ -5,9 +5,12 @@ from google.genai import types
 from dotenv import load_dotenv
 
 load_dotenv()
-client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
+# client = genai.Client(api_key=os.getenv("GEMINI_API_KEY")) # REMOVED global init
 
 MODEL_ID = 'gemini-2.5-pro'
+
+def get_client():
+    return genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 
 def get_cache_version(text):
     """Creates a unique hash for the prompt text."""
@@ -15,6 +18,7 @@ def get_cache_version(text):
 
 def get_active_cache(display_name):
     try:
+        client = get_client()
         for c in client.caches.list():
             if c.display_name == display_name:
                 return c.name
@@ -25,6 +29,7 @@ def get_active_cache(display_name):
 
 def create_cache(content_text, tools_list, display_name):
     try:
+        client = get_client()
         # PADDING LOGIC
         # Caching requires min 2048 tokens. If we are under, we pad.
         # Check count first
