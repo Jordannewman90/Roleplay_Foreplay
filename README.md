@@ -84,8 +84,10 @@ It combines legitimate tabletop RPG mechanics (stats, dice rolling, combat) with
 *   **Lazy Loading:** API clients are initialized *only* when first needed, preventing the bot from crashing on startup if environment variables are momentarily unavailable.
 
 ## 🚀 The Roadmap / Future Fun Stuff
-*   **Image Generation 2.0:** ✅ NOW LIVE! `!snapshot` and `!avatar` use the new Gemini 2.5 Image model.
-*   **Voice Mode:** ✅ NOW LIVE! The DM can now `!narrate` scenes or `!speak` custom lines using Gemini 2.5 Flash TTS.
+## 🚀 The Roadmap / Future Fun Stuff
+*   **Gemini 2.0 Flash Experience:** ✅ NOW LIVE! Running on the cutting-edge `gemini-2.0-flash-exp` for lightning-fast responses and vision capabilities.
+*   **Autonomous Vision:** ✅ NOW LIVE! The DM can now *choose* to paint a scene (`!illustrate_scene`) without you asking, if the moment is dramatic enough.
+*   **Imagen 3.0:** ✅ NOW LIVE! Scenes are generated using Google's latest Imagen 3 model.
 
 ---
 

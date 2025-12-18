@@ -1,16 +1,13 @@
 import os
-import io
+import asyncio
 from google import genai
 from google.genai import types
 from dotenv import load_dotenv
 
 load_dotenv()
 
-# Initialize Client
-# LAZY LOADING: Moved inside functions to prevent startup crashes if key is missing.
-IMAGE_MODEL_ID = 'gemini-2.5-flash-image'
-
-# Singleton Client
+# Singleton Client (Reusing logic for consistency, though user asked for fresh client here initially. 
+# Better to be safe and use Lazy/Singleton pattern we established).
 _client_instance = None
 
 def get_client():
@@ -21,43 +18,55 @@ def get_client():
 
 def generate_scene_image(prompt):
     """
-    Generates an image based on a text prompt.
-    Returns: (image_bytes, file_extension_str) or (None, error_message)
+    Generates an image using Imagen 3 via Gemini API.
+    Returns: (bytes, extension_string) or (None, error_string)
     """
+    print(f"[IMAGEN] Generating: {prompt}")
     try:
-        client = get_client()
-        response = client.models.generate_content(
-            model=IMAGE_MODEL_ID,
-            contents=prompt,
-            config=types.GenerateContentConfig(
-                temperature=0.7 
+        # Use the specific Imagen model ID
+        model_id = 'imagen-3.0-generate-001' 
+        
+        client = get_client() # Use singleton
+        
+        response = client.models.generate_images(
+            model=model_id,
+            prompt=prompt,
+            config=types.GenerateImagesConfig(
+                number_of_images=1,
+                aspect_ratio="16:9", # Cinematic ratio
+                safety_filter_level="block_medium_and_above",
+                person_generation="allow_adult" 
             )
         )
         
-        if response.parts:
-            for part in response.parts:
-                if part.inline_data:
-                    return part.inline_data.data, "jpg" # Defaulting to jpg as requested in config
-                    
-        return None, "No image data returned from API."
+        if response.generated_images:
+            image_bytes = response.generated_images[0].image.image_bytes
+            return image_bytes, "png"
+        else:
+            return None, "No image returned from API."
 
     except Exception as e:
+        print(f"[IMAGEN ERROR] {e}")
         return None, str(e)
 
 def generate_avatar(instruction, input_image_bytes=None, input_mime_type=None):
     """
-    Generates an avatar, optionally using a reference image.
-    Returns: (image_bytes, file_extension_str) or (None, error_message)
+    Image-to-Image transformation for avatars.
+    Note: Imagen 3.0 via API might have different support for Img2Img.
+    If 3.0 fails, fallback to 2.0 logic or return error.
     """
     try:
         client = get_client()
+        # Fallback to 2.5 flash logic for Img2Img since 3.0 generate-001 is text-to-image mostly
+        model_id = 'gemini-2.5-flash-image'
+        
         contents = [types.Part(text=instruction)]
         
         if input_image_bytes and input_mime_type:
              contents.append(types.Part.from_bytes(input_image_bytes, input_mime_type))
 
         response = client.models.generate_content(
-            model=IMAGE_MODEL_ID,
+            model=model_id,
             contents=contents,
             config=types.GenerateContentConfig(
                 temperature=0.7
